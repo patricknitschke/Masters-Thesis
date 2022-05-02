@@ -1,0 +1,39 @@
+\documentclass[british,titlepage, oneside]{project_setup}
+
+\addbibresource{bibliography.bib}
+
+\input{glossary.tex} % add glossary and acronym lists before document
+
+\setstretch{1.25}
+\begin{document}
+
+\input{chapters/0a-abstract}
+\input{chapters/0b-sammendrag}
+\input{chapters/0c-preface}
+\input{chapters/0d-acknowledgements}
+
+\tableofcontents
+\listoffigures
+\listoftables
+%\lstlistoflistings
+
+\printglossary[type=\acronymtype] % Print acronyms
+\printglossary                    % Print glossary
+
+\input{chapters/1-introduction}
+\input{chapters/2-theory}
+\input{chapters/3-related_works}
+\input{chapters/4-problem_formulation}
+\input{chapters/5-proposed_approach}
+\input{chapters/6-implementation}
+\input{chapters/7-nav_policy_evaluation}
+\input{chapters/8-vae_evaluation}
+\input{chapters/9-conclusions}
+
+\printbibliography
+\appendix
+\input{appendices/a-appendix}
+\input{appendices/b-appendix}
+\input{appendices/c-appendix}
+
+\end{document}

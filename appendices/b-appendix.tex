@@ -1,0 +1,87 @@
+\chapter{Algorithms}
+\label{app:algs}
+
+\section{One-step Actor-Critic}
+\label{app:algs_ActorCritic}
+\begin{algorithm}
+\caption{One-step Actor-Critic, from \cite{suttonAndBartoBook}} \label{alg:OneStepActorCritic}
+    \begin{algorithmic}[1]
+    \State Input: a differentiable policy parameterisation $\pi (a \mid s, \boldsymbol{\theta}$
+    \State Input: a differentiable state-value function parameterisation $\hat{v}(s, \boldsymbol{w})$
+    \State Parameters: step sizes $\alpha^{\boldsymbol{\theta}} > 0$, $\alpha^{\boldsymbol{w}} > 0$ (learning rates)
+    \State Initialize policy parameters $\boldsymbol{\theta} \in \R^{d'}$ and state-value weights $\boldsymbol{w} \in \R^d$
+    \For {each episode}
+    
+        \State Initialize S (first state of episode)
+        \State I $\gets$ 1
+        
+        \While {\text{S is not terminal}}
+        
+            \State A $\sim \pi ( \dot \mid S, \boldsymbol{\theta})$
+            \State Take action A, observe S', R
+            \State $\delta \leftarrow R + \gamma \hat{v}(S', \boldsymbol{w}) - \hat{v}(S, \boldsymbol{w})$
+            \State $\boldsymbol{w} \leftarrow \boldsymbol{w} + \alpha^{\boldsymbol{w}} \delta \nabla \hat{v}(S, \boldsymbol{w})$
+            \State $\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} + \alpha^{\boldsymbol{\theta}} I \delta \nabla \ln \pi (A \mid S, \boldsymbol{\theta})$
+            \State $I \leftarrow \gamma I$
+            \State $S \leftarrow S'$
+        \EndWhile
+    \EndFor
+    \end{algorithmic}
+\end{algorithm}
+\noindent
+This implementation is taken from the Sutton \& Barto's book \cite{suttonAndBartoBook}.
+
+\newpage
+\section{Proximal Policy Optimization}
+\label{app:algs_PPO}
+
+\begin{algorithm}
+\caption{PPO Actor-Critic style, from \cite{PPO}} \label{alg:PPO_actorCriticStyle}
+\begin{algorithmic}[1]
+\For {iteration = 1, 2, ...}
+    \For{actor = 1, 2, ..., $N$}
+        \State Run policy $\pi_{\theta_{old}}$ in environment for $T$ timesteps
+        \State Compute advantage estimates $\hat{A}_1 ,..., \hat{A}_T$
+    \EndFor
+    
+    \State Optimize surrogate L with respect to $\theta$, with K epochs and minibatch size $M \leq NT$
+    \State $\theta_{old} \leftarrow \theta $
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+\noindent
+This implementation is acquired from the original paper \cite{PPO}. Note that in our implementation we have $N=1$ actors. \vspace{8mm}
+
+\begin{algorithm}
+\caption{PPO-Clip, from \href{https://spinningup.openai.com/en/latest/algorithms/ppo.html}{Spinning Up, OpenAI}} \label{alg:PPO_spinningUp}
+\begin{algorithmic}[1]
+\State Input: initial policy parameters $\theta_0$, initial value function parameters $\phi_0$
+\For {k = 0, 1, 2, ...}
+    \State Collect set of trajectories $\mathcal{D}_k = \{\tau_i\}$ by running policy $\pi_k = \pi(\theta_k)$ in the environment.
+    \State Compute the return $\hat{R}_t$.
+    \State Compute advantage estimates, $\hat{A}_t$ based on the current value function $V_{\phi_k}$
+    \State Update the policy by maximizing the PPO-Clip objective:
+    \[
+    \theta_{k+1} = \arg \max_\theta \frac{1}{|\mathcal{D}_k|T} \sum_{\tau \in \mathcal{D}_k} \sum^{T}_{t=0} \min \left(
+    \frac{\pi_\theta (a_t | s_t)}{\pi_{\theta_k} (a_t | s_t)} 
+    A^{\pi_{\theta_k}}(s_t, \, a_t), \,\, g(\epsilon, A^{\pi_{\theta_k}}(s_t, \, a_t))
+    \right),
+    \]
+    typically via a stochastic gradient ascent algorithm with Adam.
+    \State Fit value function by regression on mean-squared error:
+    \[
+    \phi_{k+1} = \arg \min_\phi \frac{1}{|\mathcal{D}_k|T} \sum_{\tau \in \mathcal{D}_k} \sum^{T}_{t=0}
+    \Big(
+    V_\phi (s_t) - \hat{R}_t
+    \Big)^2,
+    \]
+    typically via some stochastic gradient descent algorithm.
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\noindent
+Algorithm \ref{alg:PPO_spinningUp} is acquired from OpenAI's Spinning Up documentation:\\
+https://spinningup.openai.com/en/latest/algorithms/ppo.html 
+
+
