@@ -1,0 +1,118 @@
+\chapter{VAE Parameters}
+\label{app:vae_params}
+The parameters and output shapes of each layer in the VAE are presented in detail. Their format follows the PyTorch convention, where for example, \verb+[-1, 32, 135, 240]+ represents the batch dimension, number of filters and dimension of the feature map. The outputs are generated from the \textit{torchsummary} package at \url{https://github.com/sksq96/pytorch-summary}.
+
+\section{VAE Encoder}
+\label{app:vae_encoder}
+\begin{verbatim}
+----------------------------------------------------------------
+        Layer (type)               Output Shape         Param #
+================================================================
+            Conv2d-1         [-1, 32, 135, 240]             832
+            Conv2d-2          [-1, 32, 68, 120]          25,632
+       BatchNorm2d-3          [-1, 32, 68, 120]              64
+            Conv2d-4           [-1, 32, 34, 60]           9,248
+       BatchNorm2d-5           [-1, 32, 34, 60]              64
+            Conv2d-6           [-1, 32, 34, 60]           9,248
+            Conv2d-7           [-1, 32, 34, 60]           1,056
+       BatchNorm2d-8           [-1, 32, 34, 60]              64
+            Conv2d-9           [-1, 64, 17, 30]          18,496
+      BatchNorm2d-10           [-1, 64, 17, 30]             128
+           Conv2d-11           [-1, 64, 17, 30]          36,928
+           Conv2d-12           [-1, 64, 17, 30]           2,112
+      BatchNorm2d-13           [-1, 64, 17, 30]             128
+           Conv2d-14           [-1, 128, 9, 15]          73,856
+      BatchNorm2d-15           [-1, 128, 9, 15]             256
+           Conv2d-16           [-1, 128, 9, 15]         147,584
+           Conv2d-17           [-1, 128, 9, 15]           8,320
+           Linear-18                  [-1, 128]       2,211,968
+           Linear-19                  [-1, 128]          16,512
+================================================================
+Total params: 2,562,496
+Trainable params: 2,562,496
+Non-trainable params: 0
+----------------------------------------------------------------
+Input size (MB): 0.49
+Forward/backward pass size (MB): 16.16
+Params size (MB): 9.78
+Estimated Total Size (MB): 26.43
+----------------------------------------------------------------
+\end{verbatim}
+
+\section{VAE Decoder}
+\label{app:vae_decoder}
+\begin{verbatim}
+----------------------------------------------------------------
+        Layer (type)               Output Shape         Param #
+================================================================
+            Linear-1               [-1, 1, 128]           8,320
+            Linear-2             [-1, 1, 17280]       2,229,120
+   ConvTranspose2d-3           [-1, 128, 9, 15]         147,584
+   ConvTranspose2d-4           [-1, 64, 17, 30]         204,864
+   ConvTranspose2d-5           [-1, 64, 34, 60]         147,520
+   ConvTranspose2d-6          [-1, 32, 68, 120]          73,760
+   ConvTranspose2d-7         [-1, 32, 135, 240]          25,632
+   ConvTranspose2d-8         [-1, 16, 270, 480]          18,448
+   ConvTranspose2d-9          [-1, 1, 270, 480]             401
+================================================================
+Total params: 2,855,649
+Trainable params: 2,855,649
+Non-trainable params: 0
+----------------------------------------------------------------
+Input size (MB): 0.00
+Forward/backward pass size (MB): 28.22
+Params size (MB): 10.89
+Estimated Total Size (MB): 39.11
+----------------------------------------------------------------
+\end{verbatim}
+
+\newpage
+\section{VAE}
+Note that the two Lambda layers simply perform a middle split of the last layer of the encoder according the the dimension of $\z_t$. This is to recover the mean and covariance of the parametrised approximate posterior $\qzgived$, as shown in \cref{fig:5_encoder}.
+\begin{verbatim}
+----------------------------------------------------------------
+        Layer (type)               Output Shape         Param #
+================================================================
+            Conv2d-1         [-1, 32, 135, 240]             832
+            Conv2d-2          [-1, 32, 68, 120]          25,632
+       BatchNorm2d-3          [-1, 32, 68, 120]              64
+            Conv2d-4           [-1, 32, 34, 60]           9,248
+       BatchNorm2d-5           [-1, 32, 34, 60]              64
+            Conv2d-6           [-1, 32, 34, 60]           9,248
+            Conv2d-7           [-1, 32, 34, 60]           1,056
+       BatchNorm2d-8           [-1, 32, 34, 60]              64
+            Conv2d-9           [-1, 64, 17, 30]          18,496
+      BatchNorm2d-10           [-1, 64, 17, 30]             128
+           Conv2d-11           [-1, 64, 17, 30]          36,928
+           Conv2d-12           [-1, 64, 17, 30]           2,112
+      BatchNorm2d-13           [-1, 64, 17, 30]             128
+           Conv2d-14           [-1, 128, 9, 15]          73,856
+      BatchNorm2d-15           [-1, 128, 9, 15]             256
+           Conv2d-16           [-1, 128, 9, 15]         147,584
+           Conv2d-17           [-1, 128, 9, 15]           8,320
+           Linear-18                  [-1, 128]       2,211,968
+           Linear-19                  [-1, 128]          16,512
+           Dronet-20                  [-1, 128]               0
+           Lambda-21                   [-1, 64]               0
+           Lambda-22                   [-1, 64]               0
+           Linear-23                  [-1, 128]           8,320
+           Linear-24                [-1, 17280]       2,229,120
+  ConvTranspose2d-25           [-1, 128, 9, 15]         147,584
+  ConvTranspose2d-26           [-1, 64, 17, 30]         204,864
+  ConvTranspose2d-27           [-1, 64, 34, 60]         147,520
+  ConvTranspose2d-28          [-1, 32, 68, 120]          73,760
+  ConvTranspose2d-29         [-1, 32, 135, 240]          25,632
+  ConvTranspose2d-30         [-1, 16, 270, 480]          18,448
+  ConvTranspose2d-31          [-1, 1, 270, 480]             401
+       ImgDecoder-32          [-1, 1, 270, 480]               0
+================================================================
+Total params: 5,418,145
+Trainable params: 5,418,145
+Non-trainable params: 0
+----------------------------------------------------------------
+Input size (MB): 0.49
+Forward/backward pass size (MB): 45.37
+Params size (MB): 20.67
+Estimated Total Size (MB): 66.53
+----------------------------------------------------------------
+\end{verbatim}

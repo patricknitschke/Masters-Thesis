@@ -1,11 +1,11 @@
-\documentclass[british,titlepage, oneside]{project_setup}
+\documentclass[british,titlepage,oneside]{project_setup}
 
 \addbibresource{bibliography.bib}
 
 \input{glossary.tex} % add glossary and acronym lists before document
 
-\setstretch{1.25}
 \begin{document}
+\setstretch{1.2}
 
 \input{chapters/0a-abstract}
 \input{chapters/0b-sammendrag}
@@ -28,12 +28,14 @@
 \input{chapters/6-implementation}
 \input{chapters/7-nav_policy_evaluation}
 \input{chapters/8-vae_evaluation}
-\input{chapters/9-conclusions}
+\input{chapters/9-discussion}
+\input{chapters/10-conclusions}
 
 \printbibliography
 \appendix
-\input{appendices/a-appendix}
-\input{appendices/b-appendix}
-\input{appendices/c-appendix}
+\input{appendices/acronyms}
+\input{appendices/algorithms}
+\input{appendices/network_size}
+\input{appendices/environments}
 
 \end{document}

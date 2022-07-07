@@ -1,0 +1,50 @@
+\chapter{Discussion}
+\label{chap:9_discussion}
+
+\section{Navigation Policy}
+When and why does unsupervised pretraining work, chap 15.1.1 book
+unsupervised pretraining is likely to be most useful when the function to be learned is extremely complicated. \cite{DeepLearningBook}
+
+Read discussion from \cite{pfeiffer2017perception}. Very good points and at the end:
+``Furthermore, we observed that the deep planner is able to avoid small dead ends if it approaches them from the outside. Once the robot enters a convex dead-end region, it is not capable of freeing itself. In addition to that, the robot’s heading sometimes fluctuates before avoiding an obstacle. This issue will be further analyzed and might be solved by using recurrent neural networks with internal memory''. We have the same exact issue -- purely reactionary.
+
+It has often been assumed that standard policy search methods such as those explored in the present
+work are simply too fragile to scale to difficult problems: End-to-End Training of Deep Visuomotor Policies paper, very relevant start.
+
+Standard policy search is thought to be difficult because it deals simultaneously with complex environmental dynamics and a complex police, cite DDPG.
+
+Autonomous Drone Racing with PPO \cite{song2021droneRacing}, they said 3 reasons for success: stable and fast training through 1) parallel sampling scheme 2) distributed initialisation strategy 3) random track curriculum. Gate poses are sent as observations
+
+Simultaneously, there has also been developments in GPU-based differentiable physics simulators, making it possible to calculate the analytic gradients and make efficient use of it when finding the policy gradient \cite{oldDifferentiablePhysicsSimulator, differentiablePhysicsSimulator}. Could lead to faster learning. 
+
+\cite{MotionPlanningAmongDynamicAgentsDRL2018} states that pretraining is necessary for them, otherwise robot wanders around and never accumulates reward (in 3C). After pretrainig, reaches goal every time, but poor for collision avoidance.
+
+Standard model-free deep RL aims to unify these challenges of representation learning and task learning into a single end-to-end training procedure. However, solving both problems together is difficult, since an effective policy requires an effective representation, and an effective representation requires meaningful gradient information to come from the policy or value function, while using only the model-free supervision signal (i.e., the reward function). As a result, learning directly from images with standard end-to-end RL algorithms can in practice be slow, sensitive to hyperparameters, and inefficient. SLAC \cite{stochastic_latent_actor_critic} intro. Opposite of navrep \cite{NavRep_unsupervised}.
+
+NavRep paper also found that only marginal performance was gained in using LSTM hidden state, most important was to include z encoding from VAE (page 6).
+
+For example, if the reward function is overcompensating for conservative behaviour -- such as a large reward for being far from obstacles -- this expectation could well be met but through the agent remaining completely still.
+ 
+The overall initial concern is that reinforcement learning is generally sample-intensive, which is why learning a policy from scratch almost always demands the use of a simulator. For complicated tasks, it can be difficult to learn the policy unless the policy repeatedly attempts ``lucky'' sequences of actions which provide a high reward and large gradient to push the network in the right direction. Having an observation space with dimension $\R^{77}$ means that a lot of numbers are changing and for an agent -- imperative to first know which is important for goal-reaching.
+ 
+warmStart (training a network with pre-existing weights) is generally bad -- paper from Microsoft \cite{warmStart}. Empirical study. Particularly for recommender systems, when you have input streams, how should you update your model? combine new date with old and retrain (cold-start)? or combine new with old and from existing weights (warm-start)? Cold-start always performs better unintuitively. \cite{warmStart} shrink-and-perturb trick (half weights and add gaussian noise) is best. I guess strictly speaking we don't have new data, it is the same? but in new environments I guess you can classify it as new data -- so possible technique to try out.
+ 
+Parallel initialisation -- where do I put this? So I think one of the main reasons why project failed is explained abstractly in batch-size invariance paper \cite{batchsizeInvariance}. Basically, when performing gradient updates, the update rule in TRPO \eqref{eq:2_trpo_actor_objective} is based on off-policy importance sampling -- because behaviour policy is not the same as update policy, we compensate (remove bias) by weighing gradient updates by the ratio. However, look at decoupled policy objective in \cite{batchsizeInvariance}, one of the reasons for stability is that updated policy has to stay close to prox policy -- by close we mean not similar to behaviour policy, but how \textit{old} prox policy is. When doing updates, two choices for choosing pi old when calculating the ratio: the policy immediately preceding the current iteration, pi recent, and the behaviour policy pi behav. For project, when we got high gradients, pi old became very old after many iterations (8 updates from 8000 batch steps), so new policy unstable. Instead, gradients should be weighted by how different they from policy used to collect data. 
+Isaac gym -- we are allowed to use big batch sizes, because parallel means that big batch still only has few steps and updates often. when doing updates, the trajectory is always filled with experience from recent policy. check this though
+
+One of the main conclusions in \cite{project_thesis} is that due to the limited exploratory nature of on-policy PPO, a parallel initialisation scheme would be very beneficial to help prevent the agent from converging to some local optimum. This is also why \cite{song2021droneRacing} credits a parallel initialisation scheme as one of three key factors for success.
+
+
+\section{VAE}
+mobilenetv3-small is used in high-speed flight in the wild (instead of DroNet) has 224x3 default input size with 2.5 mil params. 
+
+Random initialisation -- symmetry breaking \cite{LectureNotesSparseAutoencoder}.
+
+See appendix B in VAE paper \cite{variational_bayes}. The analytic solution for KL divergence between approx posterior and prior is introduced, but the implementation in train\_vae.py was missing a .pow(2) on logvar -- saw the same in other implementations. Keras tutorial loss doesn't use analytic solution, instead just computes log of Gaussian pdfs and takes the difference (same as KL div), works well.
+
+often we want batch norm for stability, KL div already pushes latent variables to follow normal distribution, so this is a nice side-effect during training.
+
+
+binary cross-entropy does maximum likeihood estimatiion, but it assumes our data is Bernoulli distributed (black white pixels) -- pushes pixels to either 0 or 1.
+MSE is maximum likelihood estimation, which is cross entropy too, but it assumes our target distribution $p(\d)$ is Gaussian. That's why it is centered around 0.5.
+remember that we're minimising the KL divergence between our input data and model. VAEs specify a regularisation term that penalises p-z from deviating from Gaussian, but it does not make an assumption on p-data. This is specified in the reconstruction loss.

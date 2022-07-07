@@ -1,2 +1,11 @@
 \chapter{VAE Evaluation Studies}
 \label{chap:8_vae_evaluation_studies}
+compare BCE and MSE
+
+\section{Vanilla Loss Function}
+
+\section{Depth Weighted Loss}
+One of the adverse effects of these two additions is the excessive blurring of the depth images. Since we specified that it was important to \textit{at least} detect close obstacles, the VAE was inclined to create very large obstacles, or even \textit{phantom obstacles}. This occurred because the VAE only incurred a high loss if it \textit{did not} detect a close obstacle, but not if it misdetected one. 
+
+\section{Depth Weighted Loss With Edge Loss}
+the edge loss aims to improve the resolution (contrast) of the reconstructions, so that they are not over-blurred as a result of filtering. In a sense, it provides an extra loss signal to give the VAE a direction on how to filter depth images implicitly.

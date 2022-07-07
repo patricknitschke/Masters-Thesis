@@ -50,7 +50,7 @@ This implementation is taken from the Sutton \& Barto's book \cite{suttonAndBart
 \end{algorithmic}
 \end{algorithm}
 \noindent
-This implementation is acquired from the original paper \cite{PPO}. Note that in our implementation we have $N=1$ actors. \vspace{8mm}
+This implementation is acquired from the original paper \cite{PPO}. Note that in our implementation we have $N=512$ actors. \vspace{8mm}
 
 \begin{algorithm}
 \caption{PPO-Clip, from \href{https://spinningup.openai.com/en/latest/algorithms/ppo.html}{Spinning Up, OpenAI}} \label{alg:PPO_spinningUp}
@@ -84,4 +84,21 @@ This implementation is acquired from the original paper \cite{PPO}. Note that in
 Algorithm \ref{alg:PPO_spinningUp} is acquired from OpenAI's Spinning Up documentation:\\
 https://spinningup.openai.com/en/latest/algorithms/ppo.html 
 
+\newpage
+\section{Auto-Encoding Variational Bayes}
+\label{app:algs_vae}
 
+\begin{algorithm}
+\caption{Minibatch version of Auto-Encoding Variational Bayes (AEVB) algorithm, from \cite{variational_bayes}} \label{alg:vae_variational_bayes}
+\begin{algorithmic}[2]
+\State $\bt, \boldsymbol{\phi} \leftarrow$ Initialise parameters
+\Repeat
+    \State $\boldsymbol{X}^M \leftarrow$ Random minibatch of $M$ datapoints (drawn from the full dataset)
+    \State $\boldsymbol{\epsilon} \leftarrow$ random samples from noise distribution $p(\boldsymbol{\epsilon})$
+    \State $\boldsymbol{g} \leftarrow \nabla_{\bt, \boldsymbol{\phi}}\mathcal{L}^M(\bt, \boldsymbol{\phi}; \boldsymbol{X}^M, \boldsymbol{\epsilon})$ calculate gradients of minibatch estimator \eqref{eq:2_vae_loss_estimator_dataset}
+    \State $\bt, \boldsymbol{\phi} \leftarrow \boldsymbol{g}$ Update parameters using gradients $\boldsymbol{g}$
+\Until{convergence of parameters}
+\end{algorithmic}
+\end{algorithm}
+\noindent
+This implementation is acquired from the original paper \cite{variational_bayes}. We chose a Gaussian distribution $\mathcal{N}(\epsilon; 0, 1)$ for the noise distribution $p(\boldsymbol{\epsilon})$, and updated our parameters using Adam \cite{adam}. 

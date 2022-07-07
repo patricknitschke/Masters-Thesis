@@ -40,15 +40,15 @@
             \textsc{\large Cybernetics and robotics, Master's Thesis }\\[2.5cm]
             
             % Title
-            { \Large \bfseries Map-Free Navigation in Cluttered Environments \\[0.3cm] Using Deep Reinforcement Learning }\\[3cm]
-
+            { \Large \bfseries Reinforcement Learning for Fast, Map-Free Navigation \\[0.3cm] in Cluttered Environments Using Aerial Robots}\\[3cm]
+            
             % Author
             \large
             Patrick Nitschke \\[0.2cm]
             {\large \today} \\[4cm]
             
             \large
-            Supervisor: Prof. Kostas Alexis \\[0.2cm]
+            Supervisor: Prof. Dr. Kostas Alexis \\[0.2cm]
             Co-supervisers: Dinh Huan Nguyen, Mihir Kulkarni
             \vfill
             
@@ -138,7 +138,7 @@
 %% CUSTOMISATION
 
 % Page geometry and spacing (same for even and odd pages)
-\geometry{left=3cm, right=3cm, top=4cm, bottom=4.5cm}
+\geometry{left=2.6cm, right=2.6cm, top=4cm, bottom=4cm}
 \frenchspacing
 
 % Roman page numbers from the beginning of the document
@@ -277,60 +277,81 @@
 \usepackage{algorithm}
 \usepackage{algpseudocode}\usepackage{amsmath}
 \usepackage{textcomp,gensymb}
+\usepackage{mathtools}
+\usepackage{svg}
 
 
 %% Personal commands
 \newcommand\numberthis{\addtocounter{equation}{1}\tag{\theequation}}
 
-% Background
-\newcommand{\bt}{\boldsymbol{\theta}}
-\newcommand{\nbt}{\nabla_{\boldsymbol{\theta}} \,}
-\newcommand{\btQ}{\boldsymbol{\theta}^Q}
-\newcommand{\btQtarg}{\boldsymbol{\theta}^{Q'}}
-\newcommand{\btmu}{\boldsymbol{\theta}^\mu}
-\newcommand{\btmutarg}{\boldsymbol{\theta}^{\mu'}}
-\newcommand{\nbtmu}{\nabla_{\boldsymbol{\theta^\mu}} \:}
-\newcommand{\E}{\mathbb{E}}
-\newcommand{\Qt}{Q\,(s,a \,|\, \boldsymbol{\theta}^Q)}
-\newcommand{\mut}{\mu\,(s\,|\, \boldsymbol{\theta}^\mu)}
+% Theory
+\newcommand{\bx}{\boldsymbol{x}}
+\newcommand{\bz}{\boldsymbol{z}}
+\newcommand{\br}{\boldsymbol{r}}
+\newcommand{\bw}{\boldsymbol{w}}
 
-\newcommand{\pibt}{\pi_{\boldsymbol{\theta}} (a \, | \, s)} % PPO actor
-\newcommand{\pibtold}{\pi_{\boldsymbol{\theta}_\text{old}} (a \, | \, s)}
-\newcommand{\Vbt}{V_{\boldsymbol{\theta}} (s)} % PPO critic
+\newcommand{\bt}{\boldsymbol{\theta}}
+\newcommand{\pbt}{p_{\boldsymbol{\theta}}}
+\newcommand{\pbts}{p_{\boldsymbol{\theta}^*}}
+\newcommand{\qbp}{q_{\boldsymbol{\phi}}}
+\newcommand{\qbps}{q_{\boldsymbol{\phi}^*}}
+\newcommand{\gbp}{g_{\boldsymbol{\phi}}}
+\newcommand{\loss}{\mathcal{L}}
+\newcommand{\E}{\mathbb{E}}
 
 \newcommand{\hatE}{\hat{\mathbb{E}}_t}
 \newcommand{\hatA}{\hat{A}_t}
 
-\newcommand{\bw}{\boldsymbol{w}}
-\renewcommand{\mid}{\,|\,}
+\DeclarePairedDelimiterX{\infdivx}[2]{(}{)}{%
+  #1\;\delimsize\|\;#2%
+}
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+\newcommand{\DKL}{D_{KL}\infdivx}
+
+\newcommand{\qzgivex}{\qbp(\bz |\, \bx)}
+\newcommand{\qzgived}{\qbp(\bz |\, \d)}
+\newcommand{\pzgivex}{\pbt(\bz |\, \bx)}
+\newcommand{\pxgivez}{\pbt(\bx |\, \bz)}
+\newcommand{\pzgived}{\pbt(\bz |\, \d)}
+\newcommand{\pdgivez}{\pbt(\d |\, \bz)}
+\newcommand{\pdfgivez}{\pbt(\d^f |\, \bz)}
+\newcommand{\pdfgivezt}{\pbt(\d^f_t |\, \bz_t)}
+\newcommand{\actorpolicy}{\boldsymbol{\theta}_{\bt}(\a_t |\, \s_t, \, \z_t)}
+\newcommand{\criticVF}{V_{\bt} (\s_t, \, \z_t)}
+
+\newcommand{\Ewrtq}{\E_{\bx \sim \qzgivex}}
+
+\newcommand{\nbt}{\nabla_{\boldsymbol{\theta}} \,}
+\newcommand{\pibt}{\pi_{\boldsymbol{\theta}} (a \, | \, s)} % PPO actor
+\newcommand{\pibtold}{\pi_{\boldsymbol{\theta}_\text{old}} (a \, | \, s)}
+\newcommand{\Vbt}{V_{\boldsymbol{\theta}} (s)} % PPO critic
 
 
 % Method
+\newcommand{\pibtd}{\pi_{\boldsymbol{\theta}} (a \, | \, s, \, d)} % PPO actor
+\newcommand{\pibtz}{\pi_{\boldsymbol{\theta}} (a \, | \, s, \, z)} % PPO actor
+
+
+
+
 \newcommand{\p}{{\boldsymbol{p}}}
+\renewcommand{\f}{{\boldsymbol{f}}}
+\newcommand{\q}{{\boldsymbol{q}}}
+\newcommand{\s}{{\boldsymbol{s}}}
+\renewcommand{\d}{{\boldsymbol{d}}}
+\newcommand{\z}{{\boldsymbol{z}}}
+\newcommand{\bT}{{\boldsymbol{\Theta}}}
+\newcommand{\bo}{{\boldsymbol{\omega}}}
 \renewcommand{\v}{{\boldsymbol{v}}}
 \renewcommand{\a}{{\boldsymbol{a}}}
-\newcommand{\x}{{\boldsymbol{x}}}
 \newcommand{\y}{{\boldsymbol{y}}}
-\newcommand{\z}{{\boldsymbol{z}}}
 \newcommand{\R}{\mathbb{R}}
-
+\newcommand{\rew}[1]{R_{\text{#1}}}
+\newcommand{\pen}[1]{P_{\text{#1}}}
+\newcommand{\gain}[1]{K_{\text{#1}}}
 
 \DeclareMathOperator*{\argmax}{arg\,max}
 \DeclareMathOperator*{\argmin}{arg\,min}
 
 % Results
 \usepackage{array}
-\newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}} % Horizontal centering column
-\newcolumntype{M}[1]{>{\centering\arraybackslash}m{#1}} % Vertical centering column
-\newcommand{\one}{4-44$\alpha$ }
-\newcommand{\two}{4-44 } 
-\newcommand{\three}{4-44E } 
-\newcommand{\four}{4-84EV } 
-\newcommand{\five}{8-44 } 
-\newcommand{\six}{8-84EV } 
-\newcommand{\seven}{8-88EV } 
-\newcommand{\eight}{8-154 } 
-\newcommand{\nine}{8-154E } 
-\newcommand{\ten}{8-154EV } 
-\newcommand{\eleven}{8-158EV }
-\newcommand{\twelve}{16-154 } 

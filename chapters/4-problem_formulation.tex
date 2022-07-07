@@ -1,3 +1,97 @@
 \chapter{Problem Formulation}
 \label{chap:4_problem_formulation}
 
+The overarching task for this thesis is the autonomous navigation of an aerial robot in a cluttered environment without any access to a global map but equipped with some device for perception: monocular, RGB or depth camera, or LiDAR. We also assume that we have access to the quadrotor state but not its shape nor its dynamics, and that there exists some goal state to reach (e.g. a specified waypoint from some global planner). In this context, we wish to design a safe, local planner that is capable of both collision avoidance and reaching a specified goal in 3-dimensional space.
+
+From the previous chapter we have seen that there are many ways of approaching this problem, with some of them either requiring a dataset for training some prediction network \cite{dronet}, an offline map of the environment to generate a reference trajectory \cite{supervised_DeepDroneRacing}, access to expert planners \cite{highSpeedObstacleAvoidanceMonocularVision2005, HighSpeedFlightWild}, or access to a model-based control library \cite{deepCollisionPredictorOracle}. Otherwise, some approaches were also to a finite set of discrete actions \cite{learning_to_fly_by_crashing, highSpeedObstacleAvoidanceMonocularVision2005, TowardsMonocularVisionObstacleAvoidanceDeepRL2017}.
+However, in this thesis, we do not assume to have access to these resources and choose to not limit ourselves to discrete action spaces. The latter will serve to not impede the scalability of our method to higher dimensional problems (e.g. navigation in 3-dimensions), and also upholds versatility and navigational efficiency of the aerial robot to a more higher degree. 
+Last, we aim to maintain a simple and flexible simulation environment that does not need to be heavily customised, e.g. with high texture \cite{cad2rl, HighSpeedFlightWild}, to demonstrate the robustness of the learning method.
+
+To address the above-mentioned points, we model the problem as two-fold: an unsupervised representation learning task, followed by a model-free reinforcement learning task in simulation. 
+Specifically, we first wish to learn a representation of the depth images, and then find a control policy that is capable of guiding a quadrotor towards a goal in an obstacle filled environment. The control policy should then be capable of deciding the motion of the quadrotor through a reference velocity and a steering angle, based on a depth image representation and the quadrotor state. 
+Framing the problem in this way guarantees a minimal amount of feature engineering (with the exception of the reward function) and allows the training methodology to be generalised to other domains.
+
+\section{The Reinforcement Learning Task}
+\label{sec:4_reinforcement_learning_task}
+The learning task for navigation in a reinforcement learning context is to find the parameters $\bt$ of a stochastic policy, $\pibtz$, that maximises the expected return $G_t$ under the induced trajectory distribution $p_\pi$. The policy should map observations $S_t$ to a probability distribution across actions $A_t$, where the sampled actions $A_t$ should allow our quadrotor state $\s_t$ to converge towards some goal state $\s^*$ as $t \rightarrow T$, where $T$ is the end of an episode.
+
+Since we are dealing with a navigation task with access to the quadrotor state and a depth image representation, we can specify the agent observations and actions as:
+\begin{equation}
+    S_t = 
+    \begin{bmatrix}
+    \s_t \\
+    \z_t
+    \end{bmatrix} \in \mathbb{R}^{77}, \qquad
+    A_t = 
+    \begin{bmatrix}
+    \v^d_t \\
+    r^d_t
+    \end{bmatrix} \in \mathbb{R}^{3}
+    \label{eq:4_state_action_space}
+\end{equation}
+Here, $\s_t \in \mathbb{R}^{13}$ is the quadrotor state, $\z_t \in \mathbb{R}^{64}$ is the depth image representation, $\v^d_t \in \mathbb{R}^2$ is the desired velocity in the $x$ and $z$ axes of the body frame, $r_t^d \in \mathbb{R}$ is the desired yaw rate. 
+
+The quadrotor state $\s_t$ consists of the position $\p_t \in \mathbb{R}^3$, velocity $\v_t \in \mathbb{R}^3$, orientation $\q_t \in \mathbb{R}^4$ and angular velocity $\bo_t \in \mathbb{R}^3$:
+\begin{equation}
+    \s_t = \begin{bmatrix}
+        \p_t \\
+        \v_t \\
+        \q_t \\
+        \bo_t \\
+    \end{bmatrix} \in \mathbb{R}^{13}
+    \label{eq:4_quadrotor_states}
+\end{equation}
+where (following notation from \cite{Fossen2021}), 
+\begin{equation}
+    \p_t = \begin{bmatrix}
+        x^b_{ib} \\
+        y^b_{ib} \\
+        z^b_{ib} 
+    \end{bmatrix} \in \mathbb{R}^{3}, \quad
+    \v_t = \begin{bmatrix}
+        u^b_{i} \\
+        v^b_{i} \\
+        z^b_{i} 
+    \end{bmatrix} \in \mathbb{R}^{3}, \quad
+    \q_t = \begin{bmatrix}
+        \eta \\
+        \epsilon_1 \\
+        \epsilon_2 \\
+        \epsilon_3
+    \end{bmatrix} \in \mathbb{R}^{4}, \quad
+    \bo_t = \begin{bmatrix}
+        p^b_{i} \\
+        q^b_{i} \\
+        r^b_{i} 
+    \end{bmatrix} \in \mathbb{R}^{3}
+    \label{eq:4_quadrotor_states_detailed}
+\end{equation}
+The position $\p_t$, linear velocity $\v_t$ and angular velocity $\bo_t$ is expressed in the body frame $\mathcal{B}$ with respect to the goal frame $\mathcal{I}$, while the orientation $\q_t$ denotes the rotation of quadrotor body frame $\mathcal{B}$ with respect to the goal frame $\mathcal{I}$, represented in quaternions. Also, the goal frame $\mathcal{I}$ is stationary and represents an approximate inertial frame.
+To simplify the task of reaching the target, we choose the desired goal state to always be the center of the goal frame, such that $\p_t$ should converge to $\boldsymbol{0}$ as $t \rightarrow T$.
+
+As for the action space, the desired velocity $\v_t^d$ is:
+\begin{equation}
+    \v_t^d = \begin{bmatrix}
+        u^d \\
+        w^d
+    \end{bmatrix} \in \mathbb{R}^{2}
+    \label{eq:4_quadrotor_action_space}
+\end{equation}
+where, $u^d$ and $w^d$ are the desired velocities of the quadrotor along the body $x$ and $z$ axes, with respect to the goal frame $\mathcal{I}$ (the notation is omitted for clearness).
+
+\section{The Representation Learning Task}
+\label{sec:4_representation_learning_task}
+Next, to obtain a good representation for the depth images $\d$, we can first assume that these depth images are generated from the conditional distribution $\pdgivez$, where $\bz$ is some hidden continuous random variable. Based on this assumption, we are interested to find $\bz$ as this code serves as a latent representation of our depth data $\d$. To do this, we attempt to learn the true posterior distribution $\pzgived$ through variational inference, where we attempt to approximate $\pzgived$ with a family of parametric distributions $\qzgived$. We then aim to optimise for the variational parameters $\boldsymbol{\phi}$, such that the approximate posterior $\qzgived$ best approximates the true posterior distribution $\pzgived$.
+
+Furthermore, since our intention is to use this model in combination with a reinforcement learning agent for fast navigation on a small, robotic platform -- we are restricted to a lightweight inference network for representing $\qzgived$.
+Moreover, to ensure training a relatively quick convergence of our navigation policy, we also wish to restrict the dimension of our latent space to a maximum of $\mathbb{R}^{64}$ so that we minimise the complexity of the observation-action mapping space. 
+As a result of this, a model will be have a constrained representational capacity and lack the ability to represent all details of a given depth image -- and so the ability to reproduce them in a reconstruction. Therefore, we identify a list of some important characteristics of depth images that are essential for collision avoidance for which a model should prioritise in its latent representation:
+\begin{enumerate}
+    \item \textbf{Geometric shapes} -- Certainly, a depth reconstruction should resemble its original depth image input to some degree. Thus, we expect that a model should be able to estimate the rough shape of seen obstacles. This is should also help the model to generalise to unseen obstacles.
+    \item \textbf{Clear, close obstacles} -- In a very cluttered environment, it may be too demanding to expect the reconstructions of all shapes in the environment. For collision avoidance, it is critical that \textit{at least} very close objects are detected and represented clearly. 
+    \item \textbf{Thin obstacles} -- Wires, poles and thin pillars are examples of obstacles that could easily be missed in a depth reconstruction. It is important that a quadrotor is not blind to these when it approaches them.
+\end{enumerate}
+
+As it is impossible to meet all these demands simultaneously, we can compromise that the reconstruction fidelity should be a function of its distance -- simply put, we wish to observe shapes generally, but the closer it is the sharper we wish the reconstruction to be. Equally, we accept that obstacles far away can \textit{go missing}, such that a model instead prioritises those that are close.
+
+As for thin obstacles, we can reason that this might be a too difficult task in general as reproducing a thin wire can be considered a very fine detail. Thus, we can also compromise in this aspect by stating that it is not important that reconstructions of these thin obstacles are clear, only that these are not missed.
