@@ -147,7 +147,7 @@ Next, the exponential linear unit \cite{ELU} was also used due to being the defa
 The primary reason for using ELU rather than ReLU is that one of the most significant problems of ReLU is that of \textit{dead neurons}. This problem occurs when a neuron is pushed to a negative weight (e.g. from a large update), because the gradient of the ReLU activation (its output) w.r.t the negative neuron weight will always be zero. To illustrate clearly, consider the perceptron $y = \text{ReLU}(Wx + b)$. When the a \textit{positive input} $x$ is multiplied with \textit{negative weights} $W$, the output $y$ is zero, and so too the gradient $\frac{\delta y}{\delta W}$. 
 Conversely, if the \textit{input} $x$ and weights $W$ are \textit{negative}, the output $y$ is non-negative but the gradient of the output w.r.t the weights $\frac{\delta y}{\delta W} = \text{ReLU}' (x)$ is still zero because the ReLU gradient $\text{ReLU}'$ is zero for negative inputs.
 As a result, the network weight will never be able to update itself as the gradient will be zero indefinitely, irrespective of the input data.
-The benefit of ELU is that its gradient is non-zero for negative inputs close to zero. This helps to solve the \textit{dead-neuron problem} as it produces non-zero gradients that help to nudge network weights in the right direction, despite them having negative inputs. \todo{maybe move to theory}
+The benefit of ELU is that its gradient is non-zero for negative inputs close to zero. This helps to solve the \textit{dead-neuron problem} as it produces non-zero gradients that help to nudge network weights in the right direction, despite them having negative inputs. 
 
 However, it can be argued that having some sparsity in the network (due to dead neurons) is actually an advantage, which is why ReLU is the default recommendation by \cite{DeepLearningBook} for modern neural networks and is also used in \cite{AMPMotionPriors} for its actor-critic MLP. Then again, too much sparsity can result in the network losing some of its generalisation capacity.
 
@@ -173,6 +173,7 @@ Then, to avoid the extra computational load of pre-filtering depth images on the
 As for the depth weighting, we multiply the pixel-wise error of a reconstruction with the bounded depth gain $K_{\text{depth}}(d_{i,j})$, a function of the filtered-depth pixel value $d_{i,j}$:
 \begin{equation}
     K_{\text{depth}}(d_{i,j}) = \alpha_\text{depth} \cdot \min \Bigg(\frac{1}{d_{i,j} + 0.5}, 1\Bigg) \qquad \text{for} \quad  i, j \in \dim \, (\d_t^f)
+    \label{eq:5_depth_gain}
 \end{equation}
 which is illustrated in \cref{fig:5_depth_gain}.
 \begin{figure}[hbt]

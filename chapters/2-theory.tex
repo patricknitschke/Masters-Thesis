@@ -309,7 +309,7 @@ Reinforcement learning is a learning-based method for discovering complex behavi
 
 To get an overview of the basics of reinforcement learning, we can begin by looking into its definition and goal. Sutton and Barto \cite{suttonAndBartoBook} states, “reinforcement learning is learning what to do – how to map situations to actions – so as to maximise a numerical reward signal.” Further, \cite{RLinRoboticsSurvey} adds, “reinforcement learning enables a robot to autonomously discover an optimal behaviour through trial-and-error interactions with its environment." 
 From these, there are many terms that could be examined, such as, \textit{situations}, \textit{actions}, \textit{rewards}, \textit{behaviour}, \textit{trial-and-error interactions} and \textit{environment}. We can ask ourselves, “what exactly is an optimal behaviour and how to we express this?”.
-Throughout this section, we will cover these central concepts, where in the end, we will explore how \textit{temporal-difference learning}, \textit{actor-critics} and \textit{proximal policy optimisation} algorithms enable us to discover an optimal behaviour.
+Throughout this section, we will cover these central concepts, where in the end, we will explore how \textit{temporal-difference learning}, \textit{policy-gradient methods}, \textit{actor-critics} and \textit{proximal policy optimisation} algorithms enable us to discover an optimal behaviour.
 
 As reinforcement learning was the central theme of the project thesis, much of the fundamental theory in the following sections is shared with that in the project \cite{project_thesis}. As a result, many of the following subsections are taken from the project thesis, being only partially rewritten and marked with an asterisk (*).
 
@@ -338,7 +338,6 @@ Here, $S_t$, $R_t$ and $A_t$ are random variables with well-defined probability 
 
 Lastly, we see that for each state transition an agent receives a numerical \textit{reward} $R_t \in \mathcal{R} \subset \mathbb{R}$, which can be interpreted as an evaluative feedback for a choice of action $A_t$. The reward is commonly a function of the current state and action values, $R(s, a)$, and is often the main tool used to shape agent behaviour in the environment \cite{RLinRoboticsSurvey}. 
 
-Finally, the MDP can be modelled as a tuple ... \todo{Can be defined by a tuple S, A, transition dynamics, r, p0, gamma}
 
 
 \subsection{Returns*}
@@ -556,8 +555,8 @@ For example, the discretisation of these continuous spaces has a severe limitati
 As a result, these high-dimensional continuous state and control problems strictly restricts us to finding an only \textit{approximate} solution for the policy and value functions, which motivates the use of \textit{approximate solution methods} -- methods that focus on \textit{generalisation through function approximation} \cite{suttonAndBartoBook}.
 This restriction is also a motivation for the relevance of \textit{policy search}, as policies require less representational power than a value function approximation \cite{BagnellPolicySearch2003} and can frankly, just be simpler to approximate \cite{suttonAndBartoBook}.
 So, finding an adequate parametrisation of these functions has also become a key focus in reinforcement learning in recent years.
-Fortunately for us, there has been a clear parametrisation of choice for both value function and policy in recent years, through the use of \textit{neural networks} (NNs) as universal function approximators, initially inspired by the success of \textit{Deep Q-Networks} (DQNs) \cite{DQN} and later, \textit{Deep Deterministic Policy Gradients} (DDPG) \cite{DDPG}.\todo{maybe talk about DQN and DDPG, instability to train}
-In the literature, we refer to all methods that learn a parametrised policy $\pibt$, through the gradient of some performance measure $J(\bt)$ with respect to parametrised policy parameters $\bt$ as \textit{policy gradient methods}. \todo{change intro to accommodate for this intermediate subsection} 
+Fortunately for us, there has been a clear parametrisation of choice for both value function and policy in recent years, through the use of \textit{neural networks} (NNs) as universal function approximators, initially inspired by the success of \textit{Deep Q-Networks} (DQNs) \cite{DQN} and later, \textit{Deep Deterministic Policy Gradients} (DDPG) \cite{DDPG}.
+In the literature, we refer to all methods that learn a parametrised policy $\pibt$, through the gradient of some performance measure $J(\bt)$ with respect to parametrised policy parameters $\bt$ as \textit{policy gradient methods}.
 
 \subsection{Policy Gradient Methods}
 \label{subsec:2_policy_gradient_methods}

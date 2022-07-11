@@ -1,20 +1,12 @@
 \chapter*{Abstract}
-
+\begin{comment}
 A condensation of the essential information of the article.
+\end{comment}
 
-autonomous navigation in cluttered envs is hard
+Autonomous navigation in increasingly complex domains presents new challenges that question the efficiency and capability of traditional model-based methods. Though traditional approaches have been successful for unstructured environments in the past, uncertain, sensor-degraded, or dynamic environments cannot be modelled and thus be solved by these approaches. Instead, learning-based methods have become increasingly popular due to their ability to learn complex behaviour without explicit programming, where multiple components can be combined into a single model to tackle the perception, prediction and motion task of autonomous navigation.
 
-model based pipeline is too slow
+In this theme, this thesis explores the use of reinforcement learning for autonomous navigation of a quadrotor through cluttered environments, with only a depth camera. We propose a two-part deep neural network model comprised of an encoder-CNN and MLP, where the CNN serves as the perception module while the MLP is the optimal controller. With this framework, our model receives a quadrotor state and depth image as input and maps this to a velocity and yaw rate reference to reach a specified goal in three dimensions.
 
-hello learning-based methods
+To solve the task, we present the problem as an unsupervised representation learning and reinforcement learning task. The CNN is trained as an encoder of VAE that learns to reconstruct depth images, while the MLP learns to utilise the VAE latent code as a depth representation of the environment, so to be able to navigate the environment. We introduce a custom reconstruction error for the VAE to specify collision-specific features that should be prioritised in the depth encoding. We also introduce a novel reward function for the reinforcement learning agent that motivates both waypoint navigation and collision avoidance.
 
-two-part model -- perception and control
-
-use a curriculum,
-utilise a massive learning regime
-
-obtain the results ....
-
-we found that this works -- model-free RL is super nice -- plug and play with unsupervised representation to obtain robust collision avoidance comparable to state-of-the-art methods.
-
-please see attached video
+By further utilising large-scale parallelism, we present the training and evaluation of our final reinforcement learning policy, which achieves a 92.5\% success rate averaged across four known 20$\times$10 environments with varying degrees of clutter. The agent demonstrates good robustness when a Gaussian multiplicative noise $\epsilon_n \sim \mathcal{N}(1, 0.2)$ is applied to all states and actions, with an 87.5\% success rate across the four environments. However, we identify some constraints with our model -- namely dependence on accurate depth representations and a poor generalisation to larger environments. Finally, as further work, we should train our modules to handle noisy depth images, add modifications to account for generalisation, and add a prediction module in the form of an LSTM or Transformer to further improve performance.

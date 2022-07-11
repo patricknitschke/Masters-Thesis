@@ -157,15 +157,16 @@ Generally, this approach has been widely adopted for local motion planning \cite
 
 
 
-\section{VAE}
+\section{Learning a Latent Space for Collision Avoidance}
+In the VAE results, we saw that despite the training curves being uninformative, the use of different reconstruction errors resulted in very image outputs. We explain some of the consequences and some why they are so different.
 
+\subsection{MSE versus BCE}
+Though perhaps less clear than the modifications to the loss functions, is why the MSE and BCE had so different output reconstructions. To explain this, we can recall that the the main difference in the losses is what distribution they assume the input data distribution to be. Both methods do maximum likelihood estimation, but BCE assumes that our data is Bernoulli distributed, while MSE assumes it is Gaussian. What this means is that the since Bernoulli distributed variables are either 0 or 1, our BCE has a bias to pushing pixels a more contrastive difference -- black or white. On the other hand, MSE assumes that our data is centered around 0.5, and that pixel values are less likely to be at the extreme values. This shows why the BCE sometimes imagined that obstacles were closer than they were and had high contrast, while MSE had blur reconstructions, though could on average be more accurate in terms of depth.
 
-\subsection{Learning a Latent Space for Collision Avoidance}
-A perhaps unseen hero
-When and why does unsupervised pretraining work, chap 15.1.1 book
-unsupervised pretraining is likely to be most useful when the function to be learned is extremely complicated. \cite{DeepLearningBook}
-
-
+\subsection{Depth Gain and the Edge Loss}
+Though less apparent in the results is the difference between the depth gain and edge loss models. The main motivations for the edge loss was to curb the adverse effect of over-blurring the depth images. 
+Since we specified that it was important to \textit{at least} detect close obstacles, the VAE was inclined to create very large obstacles, or even \textit{phantom obstacles}. This occurred because the VAE only incurred a high loss if it \textit{did not} detect a close obstacle, but not if it misdetected one. 
+In comparison, the edge loss did improve the resolution (contrast) of the reconstructions, so that they are not over-blurred as a result of filtering. In a sense, it provides an extra loss signal to give the VAE a direction on how to filter depth images implicitly.
 
 \subsection{Latent Over-Fitting}
 A consequence of learning how to minimised edge reconstruction error is the possibility of over-fitting. In other words, due to the large weight of the edge loss, the VAE will indirectly learn what objects have what edges. In our training plots, we see that this is not an issue for the edge losses -- but we have to remember that the training and test sets both have the same depth data distribution, such that no new obstacles are seen at test time. Therefore, there is a possibility that the VAE has been over-fitting the depth data distribution, such that it generalises poorly to unseen ones, despite having no increase in test loss. 
@@ -174,26 +175,3 @@ This is also a possible reason why the simple-U's were reconstructed poorly, as 
 
 
 
-
-
-
-
-mobilenetv3-small is used in high-speed flight in the wild (instead of DroNet) has 224x3 default input size with 2.5 mil params. 
-
-Random initialisation -- symmetry breaking \cite{LectureNotesSparseAutoencoder}.
-
-See appendix B in VAE paper \cite{variational_bayes}. The analytic solution for KL divergence between approx posterior and prior is introduced, but the implementation in train\_vae.py was missing a .pow(2) on logvar -- saw the same in other implementations. Keras tutorial loss doesn't use analytic solution, instead just computes log of Gaussian pdfs and takes the difference (same as KL div), works well.
-
-often we want batch norm for stability, KL div already pushes latent variables to follow normal distribution, so this is a nice side-effect during training.
-
-
-binary cross-entropy does maximum likeihood estimatiion, but it assumes our data is Bernoulli distributed (black white pixels) -- pushes pixels to either 0 or 1.
-MSE is maximum likelihood estimation, which is cross entropy too, but it assumes our target distribution $p(\d)$ is Gaussian. That's why it is centered around 0.5.
-remember that we're minimising the KL divergence between our input data and model. VAEs specify a regularisation term that penalises p-z from deviating from Gaussian, but it does not make an assumption on p-data. This is specified in the reconstruction loss.
-
-
-\section{Modular-based Approach}
-It has often been assumed that standard policy search methods such as those explored in the present
-work are simply too fragile to scale to difficult problems: End-to-End Training of Deep Visuomotor Policies paper, very relevant start.
-
-Standard model-free deep RL aims to unify these challenges of representation learning and task learning into a single end-to-end training procedure. However, solving both problems together is difficult, since an effective policy requires an effective representation, and an effective representation requires meaningful gradient information to come from the policy or value function, while using only the model-free supervision signal (i.e., the reward function). As a result, learning directly from images with standard end-to-end RL algorithms can in practice be slow, sensitive to hyperparameters, and inefficient. SLAC \cite{stochastic_latent_actor_critic} intro. Opposite of navrep \cite{NavRep_unsupervised}.

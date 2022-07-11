@@ -1,9 +1,10 @@
 \chapter*{Preface}
 
-Builds on Project thesis \cite{project_thesis}.
+This master's thesis symbolises the end of 5-years at the Norwegian University of Science and Technology (NTNU) -- the last page of what has been an exciting educational chapter. I had the pleasure of writing it under the guidance of Prof. Dr. Kostas Alexis and PhD. candidates Dinh Huan Nguyen and Mihir Kulkarni, who are all a part of the Autonomous Robots Lab (ARL). As a result, the theme of this thesis follows from their goal -- to develop intelligent robotic systems that can complete tasks under any possible conditions in complex, dynamic and diverse environments. 
 
-Some chapters are marked with *
+The thesis was also part of the lab's initiative to explore more learning-based methods in their work and a new simulation framework released last year, Isaac Gym. This meant that the bulk of the approach had to be written and integrated with Isaac Gym from the ground up, where I had to learn an entirely new machine learning framework, PyTorch. 
+Admittedly, this has been worth it. I have been quite fortunate to receive such an exciting topic that builds on current state-of-the-art methods and tools. Looking forward, there is much to be improved in the implementation, so hopefully, this thesis (and the code) can come to good use for future students.
 
-Expects that ML is known and is written from a ML and cybernetics perspective. 
+Furthermore, this thesis builds on the project thesis \cite{project_thesis} -- essentially a crash course in reinforcement learning for robotics -- where we trained a quadrotor for waypoint navigation with no obstacles present. Unfortunately, the results were not that promising, which resulted in a sceptical and conservative development process during this thesis, being the primary motivation for the \textit{curriculum}, which in hindsight served it well.
 
-New project -- first in PyTorch 
+Since a significant focus of the project was on the theory, multiple sections in the reinforcement learning chapter are taken from the thesis and marked with (*). This is so that the theory can be presented from the absolute fundamentals, as it is not a part of NTNU's cybernetics curriculum. Otherwise, this is not the case for the deep learning aspect, as this thesis assumes that fundamentals here should be known: neural networks, gradient descent,  backpropagation, etc. We also assume the same for estimation and machine learning theory, e.g. maximum likelihood estimation, Bayesian networks and inference.
