@@ -23,15 +23,14 @@ However, until recently, the research community has been developing parallel end
 
 \section{Scope}
 This thesis explores how a mapless navigation policy for collision avoidance can be learned on a quadrotor without expert demonstrations by leveraging novel ideas in learning-based autonomous navigation combined with a massively parallel learning scheme (Isaac Gym). 
-Specifically, the aim is to infer a reference velocity and steering angle for the quadrotor given its state and depth image from a forward-facing depth camera. With this policy, an agent should be able to navigate through a cluttered environment to a goal specified in three-dimensional space.
+Specifically, the aim is to infer a reference velocity and steering angle for the quadrotor given its state and depth image from a forward-facing depth camera. With this policy, an agent should be able to navigate through a cluttered environment to some goal specified in three-dimensional space, such that it can be combined with some global path planner.
 
-To learn this policy, this thesis will present the theory and implementation of a two-part deep neural network module. The first module, a variational autoencoder (VAE), is tasked with extracting the essential information from a depth image. The second module will be a fully-connected neural network (or multi-layer perceptron) and serves as the reinforcement learning agent. The agent will receive the essential information of the depth image (i.e. its features), along with the quadrotor state, and decide on a velocity and yaw rate reference for the quadrotor. To optimise the agent, the Proximal Policy Optimisation (PPO) algorithm will be used. 
+To learn this policy, this thesis will present the theory and implementation of a two-part deep neural network module. The first module, a variational autoencoder (VAE), is tasked with extracting the essential information or features from a depth image. The second module will be a fully-connected neural network (or multi-layer perceptron) and serves as the reinforcement learning agent. The agent will receive the essential information of the depth image (i.e. its features), along with the quadrotor state, and decide on a velocity and yaw rate reference for the quadrotor. To optimise the VAE, we use the Auto-Encoding Variational Bayes (AEVB) algorithm, while agent is optimised through Proximal Policy Optimisation (PPO). We also define a custom loss function for the VAE to define important features to be prioritised, and define a reward function that is conditions an agent to be collision avoidant.
 
-Additionally, as the VAE and simulation environment is set up from scratch, the design choices for each module will also be discussed in light of intermediate results during the development phase.
+Additionally, as the VAE and MLP modules are written from scratch, the design choices and training for each module will be presented in detail. 
 For the VAE, this includes the choice of architecture and loss functions for improvements in the reconstructed images.
 For the MLP, this includes simulation setup and gradual training steps (curriculum) to achieve a stable training process and eventually collision avoidance.
-
-Finally, the intermediate and final agents will be tested in cluttered environments with varying difficulty, where their success (and failure) will be analysed. 
+Finally, this thesis will evaluate the performance of the trained policy in a series of standardised tests, ranging from known environments with varying difficult, robustness tests to noise and finally generalisation to larger domains. \todo{VAE?}
 
 \todo{example of results,
 video and link}
@@ -43,33 +42,42 @@ The outline of this thesis will be as follows:
 \vspace{2mm}
 \begin{itemize}
     \item \textbf{Chapter 1: Introduction} \\
-    Motivation for this thesis is presented, along with the ... \vspace{3mm}
+    The motivation for this thesis is presented, along with the scope of the task and the content of this thesis. \vspace{3mm}
 
     \item \textbf{Chapter 2: Theoretical Background}
+    The underlying theory for VAE is presented through the lens of unsupervised representation learning, where fundamental deep learning theory (like gradient descent) is assumed to be known. Then, a full introduction to reinforcement learning is provided, so to understand PPO.
     \vspace{3mm}
     
     \item \textbf{Chapter 3: Related Works} 
+    The approaches of previous works within learning-based motion planning are presented to get an overview of the different methods to solve the task. The motivation for reinforcement learning is put forward in comparison.
     \vspace{3mm}
     
-    \item \textbf{Chapter 4: Problem Formulation} 
+    \item \textbf{Chapter 4: Problem Formulation}
+    The learning task of this thesis is presented from a technical perspective. The problem is split into two parts -- a reinforcement and representation learning task.
     \vspace{3mm}
     
     \item \textbf{Chapter 5: Proposed Approach}
+    The two-part deep neural network model is proposed. The custom rewards, losses, training setup and architecture of the VAE and MLP are presented and discussed.
     \vspace{3mm}
     
-    \item \textbf{Chapter 6: Implementation} 
+    \item \textbf{Chapter 6: Implementation}
+    The method to prepare and train the proposed network is presented, along with various software tools and frameworks. This includes the gathering of data for VAE, the simulation setup and implementation details for optimising our reinforcement learning agent.
     \vspace{3mm}
     
     \item \textbf{Chapter 7: Navigation Policy Evaluation Studies} 
+    The step-by-step procedure for training the agent is presented and the results analysed. The agent performance is then evaluated in known environments, when exposed to noise, and in larger environments.
     \vspace{3mm}
     
     \item \textbf{Chapter 8: VAE Evaluation Studies} 
+    The results of VAE training with different loss functions are presented and their reconstructions analysed.
     \vspace{3mm}
     
-    % \item \textbf{Chapter 9: Discussion} 
+    \item \textbf{Chapter 9: Discussion}
+    We explore how a reinforcement learning agent is able to solve a collision task and why it sometimes fails. We discuss the VAE \todo{VAE}
     \vspace{3mm}
     
-    \item \textbf{Chapter 9: Conclusions} \vspace{3mm}
+    \item \textbf{Chapter 10: Conclusions} \vspace{3mm}
+    The overall approach, results and discussion points are summarised. We present further work that can be added to this thesis.
     
 \end{itemize}
 

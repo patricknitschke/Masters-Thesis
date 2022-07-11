@@ -1,11 +1,23 @@
 \chapter{Conclusions}
 \label{chap:10_conclusions}
-
+\begin{comment}
 A concise summary of essential information and findings in the project.
+\end{comment}
 
+Learning-based approaches to autonomous navigation in cluttered environments are becoming increasingly popular due to being able to learn flexible, complex behaviours that can solve a variety of challenging tasks, without the need to explicitly program them. Due to their ability to represent complex functions through deep architectures, they are able to direct map raw sensor inputs to actions which, combined with the fast parallel computing hardware, allows them to plan and execute actions at a speed in at which a model-based pipeline cannot compete.
+Further, when presented with a novel task with no prior demonstrations and an an optimal solution that is hard to formulate, reinforcement learning provides a method to learn this through only the specification of an abstract reward function.
+
+In this this thesis, we thus explored the ability of reinforcement learning to solve a collision avoidance task for a quadrotor, using only a depth camera. We proposed the use of a two part CNN-MLP model, where the CNN is the inference network of the VAE, while the MLP served as the reinforcement learning agent actor-critic. To shape our model for collision avoidance, we then introduced a novel reward function for the reinforcement learning agent, and a novel loss function for the VAE. The reward function was shaped with penalties to demotivate risky behaviour, which in hindsight may have not been optimal due to the inherent sparsity of rewards. Similarly, the customised reconstruction error of the VAE enabled us to prioritise collision-relevant features of depth images, though potentially resulted in over-fitting of the depth data distribution.
+
+Nonetheless, the evaluation studies showed that the overall approach was successful at its task, achieving 98.6\% in the hard environment which accounted for tight space. The approach also showed a promising robustness to noise, where its adverse effects were most present in tight paths, such as in the hard environment. Despite these results, the study also showed that much could improved, both in the proposed approach and the implementation of our model. Specifically, it was shown that many pass-by collisions occur due to blindness when turning, the agent frequently reversed or descended into collisions, and the agent maintained a bias when navigating past obstacles.
+It was discussed that to alleviate these problems, the concept of an internal memory had to be added to the policy, through for example the hidden state of an RNN, such that the agent is capable of predicting collisions more than one timesteps ahead, remembering passed obstacles, and finally capable of deciding more fine-tuned actions which account for these. Otherwise, implementation errors included a too small margin between the goal height and ground, a lack of normalisation in the environment setup. 
+
+On the VAE side, we saw that the \todo{finish}
 
 \section{Further Work}
 \label{sec:10_further_work}
+
+train across a wider variety of environments, and number of obstacles and size at the same time.
 
 No linearised dynamics in simulator for quadrotor. 
 Have a proper quadrotor model. 
@@ -15,3 +27,5 @@ add LSTM or transformer.
 more ablation studies?
 
 compare navigation results using other VAE models
+
+Simultaneously, there has also been developments in GPU-based differentiable physics simulators, making it possible to calculate the analytic gradients and make efficient use of it when finding the policy gradient \cite{oldDifferentiablePhysicsSimulator, differentiablePhysicsSimulator}. Could lead to faster learning. 

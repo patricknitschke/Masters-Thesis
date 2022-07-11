@@ -1,159 +1,242 @@
-\chapter{Implementation}
-\label{chap:6_implementation}
+\chapter{Proposed Approach}
+\label{chap:5_proposed_approach}
 
-In this chapter, we will present the implementation details and software frameworks used in this thesis.
-First, we describe the training setup for the VAE and the MLP. This will include the procedure for collecting a depth images dataset for VAE training, and how we define our quadrotor task in the Isaac Gym framework. Finally, we present how we define our CNN-MLP model using a reinforcement learning library, \textit{RL Games} \cite{rl-games2022}, and discuss some details of the PPO implementation.
-
-\section{Collecting a Filtered Dataset of Depth Images}
-To collect the depth for VAE training, we used a pre-existing simulator that had been developed in \cite{deepCollisionPredictorOracle}. This is the RotorS \cite{RotorS_Furrer2016} simulator, which is an extension to the simulation framework, Gazebo \cite{Gazebo}. Here, Gazebo is a is an open-source physics-based robotics simulator that allows us to design and test custom robotic models. RotorS is then a quadrotor simulator that builds on this, providing a variety of packages that range from quadrotor models to controllers to sensors. 
-
-To use RotorS for their task, \cite{deepCollisionPredictorOracle} added a quadrotor model resembling their real-life resilient micro-flyer (RMF) to RotorS, equipped with a simulated depth camera with the same specifications as an Intel RealSense Depth Camera D455, with resolution $480 \times 270$. Then to generate a dataset, the quadrotor was flown with random velocities and steering angles in a randomised environment in Gazebo until collision. While \cite{deepCollisionPredictorOracle} was interested in the state-action-collision labelled dataset, we used this framework to simply collect the depth images.
-
-Then, since we are only interested in the depth images, we flip these along their vertical axis to double the total. With almost 400,000 depth images, we filtered each of these with the IP-basic algorithm \cite{filtering_depth_completion} and batched them into TensorFlow Record files. Finally, we wrapped the record files in a PyTorch Iterable Dataset to ensure that not all depth images would be loaded into memory when iterating through the dataset.
-
-
-
-\section{Quadrotor Task in Isaac Gym}
-We utilise \textit{Isaac Gym} \cite{IsaacGym} as a large-scale parallel hardware-accelerated (GPU) simulator to initialise and run 512 environments simultaneously. Through its end-to-end GPU simulation, it avoids performance bottlenecks in CPU-GPU data transfers and allows for a high performance and simulation throughput on a single GPU.
-
-To use Isaac Gym for our task, we first have to define an MDP-like \textit{quadrotor task} that we can perform reinforcement learning in -- similar to any standard gym environment in OpenAI Gym \cite{openAIgym}. Essentially, we have to create a quadrotor model, then define its states, actions, the state-transition dynamics and the rewards an agent receives per state-action timestep. Fortunately for us, there was related task, namely \textit{Quadcopter} example in Isaac Gym, that we could adapt to our task. From this, we could use the existing quadrotor model and its states, but just redefine its observation and action spaces, the reward function and environment.
-
-\subsection{Agent}
-Beginning first with the agent, we wished to have an observation space $S_t = [\s_t, \d_t]$ consisting of the quadrotor state and depth images. To obtain the depth images, Isaac Gym allows us to add camera sensors with specific properties. Choosing its properties to model the same depth camera used to collect the VAE images, we then attached the camera to the quadrotor body using Isaac Gym's API with a follow transform to obtain depth images $\d_t$ in simulation.
-
-As for state of the agent $\s_t$, Isaac Gym's API allows us to obtain the states of all \textit{actors} (Isaac Gym assets) through a \textit{root tensor}, where every state contains 13 floats, matching \eqref{eq:4_quadrotor_states}: 3 floats for position, 4 for quaternion, 3 for linear velocity, and 3 for angular velocity. By indexing the quadrotor asset, we could then access the true quadrotor state at every time step.
-
-As for the action space, Isaac Gym allows us to control an \textit{actor} by specifying its motion directly or through its control tensors, such as applying forces to a robot's degrees of freedom. Though not recommended, we opted for the first option due to simplicity -- simply altering the quadrotor state in the root tensor to be the desired action velocity and yaw rate. This is of course non-physical behaviour since we override Isaac Gym's physics engine, meaning that changes in velocities would be instantaneous. 
-To provide some compensation for this, we adjusted the simulation timestep to be \textit{dt} $= 0.2$ seconds, which ensures that there is a suitable bandwidth separation between the reinforcement learning agent “action frequency” and an eventual closed-loop control system bandwidth, so that we can expect that an underlying control system has time to set $\v_t = \v_t^d$ at each timestep. Nonetheless, since our thesis aims to demonstrate motion planning, this choice was thought to be reasonable (given the time constraints).
-
-\subsection{Environment}
-With the agent ready, we now had to define the environment that the quadrotor was to operate in. The obstacles used in this thesis were loaded as Isaac Gym assets through Unified Robotic Description Format (URDF) files. Most importantly, these described the visual and collision geometry of various shapes, including our quadrotor model and goal. 
-In Figures \ref{fig:6_quad_goal} and \ref{fig:6_obstacles} we show the quadrotor, goal and added obstacles to our environment.
-\begin{figure}[H]
-     \centering
-     \hspace{0.04\textwidth}
-     \begin{subfigure}[b]{0.3\textwidth}
-         \centering
-         \captionsetup{justification=centering}
-         \includegraphics[width=\textwidth]{figures/6_/6_quadrotor.png}
-         \caption{Quadrotor}
-         \label{fig:6_quadrotor}
-     \end{subfigure} 
-     \hspace{0.15\textwidth}
-     \begin{subfigure}[b]{0.32\textwidth}
-         \centering
-         \captionsetup{justification=centering}
-         \includegraphics[width=\textwidth]{figures/6_/6_goal.png}
-         \caption{Goal}
-         \label{fig:6_goal}
-     \end{subfigure} 
-     \caption{Quadrotor and goal assets in our Isaac Gym environment. These are both standard assets already present in Isaac Gym, and are borrowed for this task. The quadrotor does not collide with the goal, nor is the goal visible in the depth images.}
-     \label{fig:6_quad_goal}
-\end{figure}
-
-With defined collision geometries, we could then enable collisions in the environments by placing obstacles in the same environment in the same collision group, and setting their collision filters to be 1. Since we do not want collisions with the goal however, we simply removed its collision geometry -- rendering it invisible to the depth camera and the possibility for collision. The collision filter was also set to 0, but this made did not remove it from depth images.
-
-Finally, to place these obstacles nicely in our environment, we could change the object dimensions in the URDF files, and do further scaling of objects in Isaac Gym. Then, through the root tensor, we were able to adjust their poses through rotations and randomise their position.
-
-\begin{figure}[H]
-     \centering
-     \hspace{0.04\textwidth}
-     \begin{subfigure}[b]{0.3\textwidth}
-         \centering
-         \captionsetup{justification=centering}
-         \includegraphics[width=\textwidth]{figures/6_/fence.png}
-         \caption{Fence}
-         \label{fig:6_obst_fence}
-     \end{subfigure} 
-     \hspace{0.15\textwidth}
-     \begin{subfigure}[b]{0.3\textwidth}
-         \centering
-         \captionsetup{justification=centering}
-         \includegraphics[width=\textwidth]{figures/6_/pine_tree.png}
-         \caption{Pine tree}
-         \label{fig:6_obst_pine_tree}
-     \end{subfigure} 
-     \hfill \\[2mm]
-     \hspace{0.04\textwidth}
-     \begin{subfigure}[b]{0.3\textwidth}
-         \centering
-         \captionsetup{justification=centering}
-         \includegraphics[width=\textwidth]{figures/6_/simple_u.png}
-         \caption{Simple U-shape}
-         \label{fig:6_obst_simple_u}
-     \end{subfigure} 
-     \hspace{0.15\textwidth}
-     \begin{subfigure}[b]{0.3\textwidth}
-         \centering
-         \captionsetup{justification=centering}
-         \includegraphics[width=\textwidth]{figures/6_/chair.png}
-         \caption{Chair}
-         \label{fig:6_obst_chair}
-     \end{subfigure}
-     \hfill \\[2mm]
-     \hspace{0.04\textwidth}
-     \begin{subfigure}[b]{0.3\textwidth}
-         \centering
-         \captionsetup{justification=centering}
-         \includegraphics[width=\textwidth]{figures/6_/simple_stone.png}
-         \caption{Simple stone}
-         \label{fig:6_obst_simple_stone}
-     \end{subfigure} 
-     \hspace{0.15\textwidth}
-     \begin{subfigure}[b]{0.3\textwidth}
-         \centering
-         \captionsetup{justification=centering}
-         \includegraphics[width=\textwidth]{figures/6_/simple_pyramid.png}
-         \caption{Simple pyramid}
-         \label{fig:6_obst_simple_pyramid}
-     \end{subfigure} 
-    \caption{Various obstacles are imported to our Isaac Gym environment through their URDF files. Their defined collision geometries allows them to be visible in the depth images and allows the physics engine to simulate collisions with them. By altering their dimensions and \textit{root tensors}, we could fit them nicely in our environments, with randomised poses.}
-     \label{fig:6_obstacles}
-\end{figure}
-
-\newpage
-\subsection{Parallel Initialisation}
-In regards to the parallel initialisation of the environments, this is dependent on which stage of the curriculum we are training on.
-In the first scenario with no obstacles, we initialise each environment to have a quadrotor and goal with random positions in an area $x, y \in [-3, 3]$, with $z \in [-0.2, 2]$. Furthermore, we add a ground plane at $z = 0$, and mimic ``far obstacles'' by confining each quadrotor to a $16\times8$ enclosure. This serves to bias the agent to initially ignore the depth representation input while it learns to map the quadrotor states to correct actions. 
-
-Then, for 1-obstacle environments, the quadrotor and goal for each environment is now placed at each end of their enclosure, with an obstacle placed in the middle. Their initialised $x$ positions are fixed (along the long axis), but are randomised in $y$ (short axis). Also, the quadrotors and goals are also slightly randomised in $z$. Then, we extend this design to $n$-obstacle environments, where we gradually increase the environment size and number of obstacles in between a quadrotor and goal, but ensuring that a quadrotor always has $3$m of open space before the first obstacle. An example is shown in \cref{fig:6_n_obst_env}.
+This chapter presents the methodology for solving the autonomous navigation task outlined in the previous chapter. Overall, we propose a CNN-MLP model where, given a depth image $\d_t$ and the quadrotor states $\s_t$, it decides a continuous velocity $\v^d_t$ and steering $r^d_t$ command that should avoid obstacles in a cluttered environment, while travelling towards some goal in 3-dimensional space.
+We will present and discuss this two-part model's design choices, starting with the MLP module for learning the navigation policy, then later the encoder-decoder-based CNN inference network used for representation learning. An overview of the model is shown in \cref{fig:5_overview}.
 \begin{figure}[hbt]
-    \begin{subfigure}[b]{0.69\textwidth}
-        \centering
-        \includegraphics[width=0.99\textwidth]{figures/6_/6_environments.png}
-        \caption{512 environments are initialisation in parallel.\vspace{8mm}}
-        \label{fig:6_environments}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.3\textwidth}
-        \centering
-        \includegraphics[width=0.7\textwidth]{figures/6_/6_n_obst_env.png}
-        \caption{Quadrotor, goal and obstacle positions are randomised in $y$ for each environment.}
-        \label{fig:6_n_obst_env}
-    \end{subfigure}
-    \caption{An example of the parallel initialisation of environments and their obstacle placements with Isaac Gym \cite{IsaacGym}. We simulate 512 environments in parallel, where the quadrotor and goal is initialised at each end of a corridor-like enclosure with obstacles placed in between. Positions of each item are fixed in the $x$ (long axis), but randomised in $y$ (short axis). Quadrotor and goal heights (in $z$) are also slightly randomised.}
-    \label{fig:6_env_init}
+    \centering
+    \makebox[\textwidth]{
+        \hspace{15mm}
+        \includegraphics[width =1.1\textwidth]{figures/5_/5_overview.pdf}
+    }
+    \caption{An overview of our two-part model. The inference network (encoder) learns an approximate posterior distribution $\qzgived$, parametrised by a set of Gaussian distributions with an input-dependent mean $\boldsymbol{\mu}_t$ and diagonal covariance matrix $\boldsymbol{\sigma}_t$. We then sample this to get the latent representation $\z_t$. With $\s_t$ and $\z_t$, our agent -- a model-free actor-critic -- learns a policy $\actorpolicy$ which outputs a desired velocity $\v_t^d$ and yaw rate $r^d_t$.}
+    \label{fig:5_overview}
 \end{figure}
 
+\section{Learning the Navigation Policy}
+\label{sec:5_learning_navigation_policy}
+Starting first with the navigation task, we solve the reinforcement learning problem through the use of PPO. Following the theory in \cref{subsec:2_PPO}, we aim to concurrently learn a critic value function $V_{\bt}(s)$ and actor policy $\pibtz$, parametrised with parameters $\bt$. To train our actor-critic for collision avoidance, we define a custom reward function and incorporate a \textit{curriculum} \cite{LearningWalkMassivelyParallel} during training.
 
-\section{Model Implementation and PPO in RL Games}
-Now that the reinforcement learning framework was prepared, we used a reinforcement learning library called \textit{RL Games} \cite{rl-games2022} to implement our CNN-MLP network to be trained with PPO.
-The RL Games integration with IsaacGym follows strictly hierarchical structure where all specific algorithms and models inherit from general base implementations. In this way, the training setup is defined through configuration files managed by \textit{Hydra}\footnote{See how IsaacGymEnvs uses Hydra at: \url{https://github.com/NVIDIA-Omniverse/IsaacGymEnvs}.}. 
+\subsection{Reward Function}
+\label{subsec:5_reward_function}
+The reward function is one of the most powerful design tools within reinforcement learning. Using it to formalise the idea of a goal is also one of its most distinctive features \cite{suttonAndBartoBook}, since by deciding the reward structure of the environment, we can indirectly manipulate the learned agent behaviour to match the behaviour we hope to observe in testing. 
+For a navigational task, proper care must be taken to balance the rewards for different behaviours, so an agent remains navigationally efficient but careful. This is because the complex behaviour that an agent learns is based directly on the idea of maximising the total reward, which includes exploiting the environment and its reward function. Hence, any undesired behaviour that is observed during test time is often a consequence of a poorly designed reward function.
 
-\subsection{Implementing our Model}
-To integrate our model with RL games, we identified that main challenge is not how to implement PPO with our model, but how to integrate our custom network into RL Games. If we could solve this, we could then specify that our model should use our custom network in configuration, and this should allow it to be seamless optimised with PPO.
-So to solve this, we first wrapped our custom network in a \textit{network builder}. From here, we could use the \textit{model builder} to register our network in RL Games' network registry during initialisation. As a result, our network was now a part of RL games and could be chosen as for any reinforcement learning task.
+By weighing these considerations, we construct a reward function that builds on the implementation in \cite{IsaacGym}, but with additional rewards $R$ and penalties $P$ to shape the agent behaviour for collision avoidance.
+First, we motivate the agent to minimise its distance to goal by rewarding its inverse distance to goal:
+\begin{equation}
+    \rew{pos} \, (S_t) = \frac{\gain{pos}}{1 + ||\p_t||_2}
+\end{equation}
+Then, we define a set of desired behaviours we wish to see when the agent is close to goal: remain still $\rew{vel}$, stay upright $\rew{up}$ and do not spin $\rew{spin}$:
+\begin{align*}
+    \rew{vel} \, (S_t) &= \frac{\gain{vel}}{1 + ||\v_t||_2} \numberthis \\[2mm]
+    \rew{up} \, (S_t) &= \frac{\gain{up}}{1 + \left|1 - \mathcal{I}_z(\q_t)\right|^2}\,, \qquad 
+    \mathcal{I}_z(\q_t) = \frac{\epsilon_2}{\sqrt{1-\eta^2}} \numberthis\\[2mm]
+    \rew{spin} \, (S_t) &= \frac{\gain{spin}}{1 + r^2} \numberthis 
+\end{align*}
+Here, we use $\mathcal{I}_z(\q_t)$ to denote the upwards-ness of the quadrotor, where the idea is to represent the quadrotor orientation $\q_t$ in axis-angle form and then find the normalised $z$-component of the axis. For $\rew{spin}$, $r$ denotes the quadrotor yaw rate as shown in \eqref{eq:4_quadrotor_states_detailed}.
 
-Then, to use it in our custom quadrotor task, we define two configuration files, one for the setup of the quadrotor task and the other to define the model. Here, the task configuration is quite standardised, including the dimension of observation and action space, simulation parameters like $dt$, but also the number of obstacles, environment size and episode length. In contrast, the training file provided our model definition, consisting of the optimisation algorithm and its hyperparameters (batch size, learning rate, trajectory length, etc.), and our network and its hyperparameters (size, activation functions, normalised actions, separate actor-critic networks, etc.).
+As for the conservative behaviour, we specify three penalties terms: one for velocities in the blind directions of the quadrotor (vertical and backward) $\pen{vel}$, one for being too close to an obstacle $\pen{depth}$, and the last for collision $\pen{collision}$:
+\begin{align}
+    \pen{vel} \, (S_t) &=  \alpha_{\text{vert}} \cdot w^2 + \alpha_{\text{back}} \cdot v_{\text{back}}^2 \, \qquad v_{\text{back}} = 
+    \begin{cases} 
+      v & \text{if} \; v \leq 0 \\
+      0 & \text{else} 
+   \end{cases} \\[2mm]
+   \pen{depth} (S_t) &= \mu_{\text{dist}} \cdot \max \, \big(0, d_{\epsilon} - d_\text{obst}(S_t)\big)^2 \\[2mm]
+  \pen{collision} (S_t) &= \begin{cases}
+     \gain{collision} & \text{if} \; d_\text{obst}(S_t) \leq d_\text{collision} \\
+     \gain{collision} & \text{if contact force detected} \\
+     0 & \text{else}
+  \end{cases}
+\end{align}
+The depth penalty $\pen{depth}$ is a simple one-sided quadratic barrier function taken from \cite{collision_free_MPC}, consisting of a scaling parameter $\mu_{\text{dist}}$ and safety margin $d_\epsilon$. Intuitively, this means that quadrotor receives no penalty if it is further than $d_\epsilon$, but is penalised an obstacle within $d_\epsilon$ is in sight. Thus, this should motivate the agent to stop moving closer to an obstacle, and to turn elsewhere. Visually, the depth penalty is shown in \cref{fig:5_depth_penalty}.
+\begin{figure}[hbt]
+    \centering
+    \hspace{2cm}
+    \includegraphics[width=0.6\textwidth]{figures/5_/5_depth_penalty.pdf}
+    \caption{The depth penalty $\pen{depth}$ displaying the penalty for when an obstacle is closer than  $d_\epsilon = 1.0$m, when $\mu_{\text{dist}} = 0.1$. Diagram recreated from \cite{collision_free_MPC}.}
+    \label{fig:5_depth_penalty}
+\end{figure}
 
-\subsection{Normalised and Clipped Observation and Action Space}
-Next, there are some noteworthy details of the our model implementation that is relevant for our task. The first is that normalising the observation and action spaces is of particular importance in RL Games, first introduced in \cite{DDPG} and iterated also in the documentation of Stable-Baselines3, ``normalising input features may be essential to successful training of an RL agent'' \cite{stable-baselines3}. \textit{Normalising} can mean two different things in reinforcement learning, either by scaling observations to $[0, 1]$ or to have 0 mean and 1 standard deviation. The perspective this thesis takes is that image values are scaled, while everything else is normalised.
-So, to normalise the observation space in our quadrotor task, we begin by scaling our images and quadrotor states by a function of their max values. The idea is that when we gradually increase the environment size to larger values, i.e. greater $\p_t$ from goal, this should not alter the policy performance. Later, the scaled quadrotor states (and not the depth image) is then normalised its running mean and covariance, whose values are calculated throughout the training process.
-For the actions, these are not normalised but instead clipped if their values exceed 1, which was also why we avoided using a non-linear activation function for our actor-critic. For good measure, the observations space is also clipped to a max value of 5 before being normalised by its running mean and standard deviation.
+To find the distance to the closest obstacle $d_\text{obst}$, we project a point cloud from a depth image and take the norm of each point in the point cloud with the camera position and find the minimum. However, since we can only detect forward-facing collisions with the depth camera, we also detect collisions with a force sensor in simulation. 
 
-\subsection{Experience and Optimisation}
-In order to perform optimisation, PPO requires that data (experience) is sampled by its current policy into a trajectory $\boldsymbol{T}$, where each \textit{experience} element is given by a tuple $<S_t, A_t, R_t, S_{t+1}$. In the parallel learning scheme, observations $S_t = [\s_t, \d_t]$ from each environment is compiled into an observation buffer $O_t$ for each time timestep. As mentioned, these observations are then clipped and normalised, before being sent to the actor to provide actions for the current policy $\pi$. Though we simulate 512 environments, there is only one network -- for each timestep, we batch the 512 observations into an input tensor of $[512, 129613]$ and compute the forward-pass for the whole batch. The batched depth images are sent separately to the to the VAE, such that we receive $[512, 64]$. Then, by concatenating it with the quadrotor state tensor to get $[512, 64]$, our actor-critic outputs a batched action tensor $[512, 3]$. Finally, our agent observes rewards $[512, 1]$ to which it can compare to its value estimate to calculate the advantage estimate.
+From these, the full reward function is the sum of all rewards and penalties:
+\begin{equation}
+    R\,(S_t, \,A_t) = R_{\text{pos}} + R_{\text{pos}} \, (R_{\text{vel}} + R_{\text{up}} + R_{\text{spin}}) + P_{\text{vel}} + P_{\text{depth}} + P_{\text{collision}}
+\end{equation}
+where we specify $R_{\text{vel}}\,,\; R_{\text{up}}$ and $R_{\text{spin}}$ to only be important near goal by multiplying it with $\rew{pos}$.
+Finally, the reward gains, penalty coefficients and distance parameters used for the reward function are listed in \cref{table:5_reward_parameters}.
+\begin{table}[hbt]
+    \renewcommand{\arraystretch}{1.0}
+    \centering
+    \begin{tabular}{||c|c||}
+    \hline
+    \centering
+        Reward Parameter & Value \\ \hline \hline
+        $\gain{pos}$ & 2.0 \\  
+        $\gain{vel}$ & 1.0 \\ 
+        $\gain{up}$ & 1.0 \\ 
+        $\gain{spin}$ & 1.0 \\ 
+        $\gain{collision}$ & -2 \\
+        $\alpha_{\text{vert}}$ & -0.1 \\ 
+        $\alpha_{\text{back}}$ & -0.01 \\ 
+        $\mu_{\text{dist}}$ & -0.1 \\ 
+        $d_{\text{collision}}$ & 0.2 \\ \hline
+    \end{tabular}
+    \caption{List of reward gains, penalty coefficients and distance parameters used in the reward function.}
+     \label{table:5_reward_parameters}
+\end{table}
 
-Throughout this process, an \textit{experience buffer} collects the state-action pairs as the trajectory. We define the \textit{horizon} or \textit{trajectory length} to be $T=8$, such that our batch size is $512\cdot8 = 4096$. We also define a minibatch size of $M=1024$ and number of mini-epochs $K=8$. Overall, we first simulate our environment in parallel for 8 timesteps to collect a trajectory. With this we optimise for our PPO loss in minibatches, and repeat the optimisation on the trajectory for $K=8$ mini-epochs. Finally, we discard the trajectory and run the simulation for 8 timesteps to collect a new trajectory, and so on. Lastly, when calculating the gradients for the trajectory, we also utilise truncated gradients where the gradients are scaled according to Pytorch's \textit{GradScaler} and clipped by their norm.
+We note that each of the reward terms are at maximum when $\p_t, \v_t = \boldsymbol{0}$, $r = 0$ and the quadrotor is upright. At this point, the quadrotor is directly on the goal, with a reward of $R_t^\text{max} = \gain{pos} + \gain{pos}(\gain{vel} + \gain{up} + \gain{spin}) = 8$ at every timestep, assuming that we avoid all penalties. However, when the quadrotor is very far from the goal, e.g. $>10$m, this goal-motivating reward begins to be very sparse. Combined with the conservative penalties, we can imagine that it will be difficult to train a policy end-to-end in a large cluttered environment due to negligible positive rewards for flying towards a goal and considerable negative rewards for going near obstacles.
+This is also why we propose to use curriculum learning, which will be discussed in the next section.
+
+\subsection{Curriculum Learning}
+\label{subsec:5_curriculum}
+The success of this thesis' approach can largely be attributed to the setup and procedure for training the reinforcement learning agent.
+The term \textit{curriculum} was introduced by \cite{LearningWalkMassivelyParallel} and is used to describe the idea of training a policy at levels of increasing difficulty. For collision-free navigation, we leveraged this idea by training the quadrotor in progressively larger environments with an increasing density of obstacles. Two reasons can justify the reason for this: first, training a randomly initialised policy in a very difficult environment with sparse rewards can be highly time-consuming if not impossible; and second, collision avoidance is very generalisable -- once a quadrotor has learned to avoid one obstacle, it should not be difficult to extend this knowledge to two, and eventually many.
+
+We assert that before a quadrotor can learn collision avoidance, it must first learn to fly towards the goal. Our primary concern is that reinforcement learning is generally considered sample-intensive. Learning a complicated policy may just come down to waiting for a lucky sequence of actions to be repeatedly executed. In this thesis, we aim to minimise this ``luck factor'' and instead propose a three-step process that should \textit{guarantee} successful training:
+\begin{enumerate}
+    \item First, learn to fly towards the goal with no obstacles present. 
+    \item Then, learn basic obstacle avoidance by spawning the quadrotor and goal on opposite sides of \textit{one} obstacle, with the quadrotor facing the obstacle.
+    \item Last, gradually increase the number of obstacles, the environment size and the episode length $T$ to obtain an advanced collision avoidance policy.
+\end{enumerate}
 
 
+\subsection{Network Architecture}
+\label{subsec:5_MLP_architecture}
+Moving on, the actor-critic network is chosen to be a shared three-layer MLP with two separate output heads: the policy head and the value function head. Its architecture is shown in \cref{fig:5_actor_critic}. The policy $\actorpolicy$ is modelled by the actor-network, which outputs a Gaussian distribution over actions for a given quadrotor state $\s_t$ and latent code $\z_t$. The value function is parametrised by the critic network that predicts the expected return (state value) for the same input.
+\begin{figure}[hbt]
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/5_/5_actor_critic.pdf}
+    \caption{The actor-critic network architecture. The actor and critic are parameterised by a shared base network comprised of a three-layer MLP with output dimensions $[256, 128, 64]$ and ELU activation functions, and two linear (fully-connected) output heads with linear activation functions. The actor parametrises a policy $\actorpolicy$ that outputs a Gaussian distribution over actions, while the critic parametrises a value function $\criticVF$ which predicts the expected return $V_t$.}
+    \label{fig:5_actor_critic}
+\end{figure}
+
+\subsubsection{Shared Parameters in the Actor-Critic}
+The concept behind using a shared structure in the actor-critic networks is that the \textit{base network} learns the \textit{features} our input so that these can be used by the \textit{network heads} for \textit{task-specific prediction or classification}. Essentially, it is the same as representation learning, where the last layer of the shared MLP contains the representation of features of the input. 
+We can assume that to produce a correct velocity and yaw rate reference, the model should have some understanding of the agent-relative surroundings. Though in a similar vein, to be able to predict the expected return for a particular state requires the same understanding. So, in general, if two output tasks are largely related but utilise the same input, it makes sense to have a shared parametrisation for the base network with two task-specific heads.
+
+\subsubsection{Size of the Network}
+The size of the network was largely chosen according to other baseline models in \cite{IsaacGym}, and from previous experience from the project, thesis \cite{project_thesis}. From \cite{IsaacGym}, we noted that many examples utilise much larger networks, but these were also applied to tasks with ``more difficult'' observation-action mappings \cite{shadowHand, AMPMotionPriors} -- in essence, just having a much higher dimensional observation and action space.
+This idea of using larger networks is that they have a larger \textit{generalisation potential}, thus enabling them to do well in more complicated tasks. Moreover, recent research also states that over-parametrization of neural networks might even be necessary to have robust results \cite{bubeck2021aLawOfRobustness}.
+However, from experience in the project thesis, we found that larger networks take longer to train and do not necessarily produce better results immediately, therefore motivating a more conservative approach which is more in line with machine learning teachings: starting simple and increasing the complexity underway. From this, we found that a base network with size [256, 128, 64] was reasonable, along with 64 neurons for each head.
+
+\subsubsection{Activation Functions}
+In \cref{fig:5_actor_critic}, we note the use of two types of activation functions, the exponential linear unit (ELU) and linear (None), were most noteworthy is the choice of the linear activation function for the final network layer. Traditionally, we choose the final activation function based on the type of problem we have -- like \textit{sigmoid} for logistic regression (prediction or binomial classification tasks), or \textit{softmax} for multinomial logistic regression (multi-class classification). For continuous control problems with normalised action spaces, we often wish to limit our actions to a range of $[-1, 1]$, which actually makes \textit{tanh} the most suitable activation function. Nevertheless, the decision to use the linear activation function was large as a result of the baseline implementations in \cite{IsaacGym}. Instead, as an implementation detail, actions were left unbounded from the network but were clipped if their values exceeded $[-1, 1]$. 
+
+Next, the exponential linear unit \cite{ELU} was also used due to being the default implementation in \cite{IsaacGym} -- with it also being used to solve other difficult tasks \cite{shadowHand, LearningWalkMassivelyParallel}. An alternative for MLPs is, of course, the widely popular rectified linear unit (ReLU) \cite{ReLU}, but the ELU differs slightly as it has negative values for inputs less than zero. This is shown more clearly in \eqref{eq:5_elu_activation} and \cref{fig:5_relu_elu}.
+\begin{align}
+        f_\text{ELU}(x) &= \begin{cases}
+          x & \text{if} \; x > 0 \\
+          \alpha \, (\exp{(x)} - 1) & \text{if} \; x \leq 0
+        \end{cases}, \label{eq:5_elu_activation} \\
+        f_\text{ReLU}(x) &= \begin{cases}
+          x & \text{if} \; x > 0 \\
+          0 & \text{if} \; x \leq 0
+        \end{cases} \label{eq:5_relu_activation}
+\end{align}
+\begin{figure}[hbt]
+    \centering
+    \includegraphics[width=0.5\textwidth]{figures/5_/5_relu_elu.pdf}
+    \caption{Visualising the difference between the exponential linear unit (ELU) (with $\alpha = 1$) and rectified linear unit (ReLU) activation functions.}
+    \label{fig:5_relu_elu}
+\end{figure}
+
+The primary reason for using ELU rather than ReLU is that one of the most significant problems of ReLU is that of \textit{dead neurons}. This problem occurs when a neuron is pushed to a negative weight (e.g. from a large update), because the gradient of the ReLU activation (its output) w.r.t the negative neuron weight will always be zero. To illustrate clearly, consider the perceptron $y = \text{ReLU}(Wx + b)$. When the a \textit{positive input} $x$ is multiplied with \textit{negative weights} $W$, the output $y$ is zero, and so too the gradient $\frac{\delta y}{\delta W}$. 
+Conversely, if the \textit{input} $x$ and weights $W$ are \textit{negative}, the output $y$ is non-negative but the gradient of the output w.r.t the weights $\frac{\delta y}{\delta W} = \text{ReLU}' (x)$ is still zero because the ReLU gradient $\text{ReLU}'$ is zero for negative inputs.
+As a result, the network weight will never be able to update itself as the gradient will be zero indefinitely, irrespective of the input data.
+The benefit of ELU is that its gradient is non-zero for negative inputs close to zero. This helps to solve the \textit{dead-neuron problem} as it produces non-zero gradients that help to nudge network weights in the right direction, despite them having negative inputs. \todo{maybe move to theory}
+
+However, it can be argued that having some sparsity in the network (due to dead neurons) is actually an advantage, which is why ReLU is the default recommendation by \cite{DeepLearningBook} for modern neural networks and is also used in \cite{AMPMotionPriors} for its actor-critic MLP. Then again, too much sparsity can result in the network losing some of its generalisation capacity.
+
+\section{Learning the Depth Representation}
+\label{sec:5_learning_representation}
+To tackle the unsupervised representation learning problem, we use a convolutional VAE to learn the latent representation for the depth data $\d$. We use the method presented by \cite{variational_bayes} for optimising the VAE, whose theory is outlined in \cref{subsec:2_VAE_variational_autoencoders}. Additionally, to both deal with the constrained dimension of the latent space and make our VAE suitable for collision avoidance, we introduce a custom loss function that allows us to specify which depth characteristics the VAE should prioritise in its reconstructions and choose a lightweight network architecture inspired from \cite{deepCollisionPredictorOracle}, and \cite{vae_decoder_architecture}.
+
+\subsection{Ideal Depth Reconstruction With a Customised Reconstruction Loss}
+\label{subsec:5_vae_reconstruction}
+We first recall that the \textit{reconstruction loss} in \eqref{eq:2_vae_loss_estimator_single_datapoint} defines the learned behaviour of our generative network $\pdgivez$. In a vanilla VAE, it defines that the decoder $\pdgivez$ should learn to reconstruct $\d_t$ from $\z_t$, where $\z_t$ is the sampled latent code from our encoder $\qzgived$ for a given $\d_t$. Now, the key insight is that in order to properly reconstruct $\d_t$, any features of $\d_t$ that should be reconstructed must be present in $\z_t$ -- from which the VAE learned to do through the joint optimisation of the encoder and decoder in \eqref{eq:2_vae_loss_estimator_dataset}.
+This implies that if we define certain features of $\d_t$ to be more costly than others, their loss will be over-represented in the reconstruction loss, and the VAE would prioritise learning these in its latent space so that these specific features could be reconstructed, and the VAE loss minimised. 
+
+Thus, our approach is to \textit{alter the reconstruction loss} such that the VAE learns which features of the depth image distribution to prioritise in its latent space. With this, we attempt to prioritise the features in \cref{sec:4_representation_learning_task} in the latent space by presenting the following modifications:
+\begin{enumerate}
+    \item \textbf{Filtered targets} -- Instead of using the input $\d_t$ as the target reconstructions of our generative model $\pdgivez$, we use a filtered depth image $\d^f$ as the target. This means that for a given depth image $\d_t$, the generative network instead learns a probability distribution $\pdfgivezt$, where $\d^f_t = f(\d_t)$ is given by a deterministic filtering process $f$ of the depth image $\d_t$, and $\z_t \sim \qzgived$ is the sampled latent code from our encoder with input $\d_t$.
+    \item \textbf{Depth weighting} -- We weigh the pixel-wise reconstruction error by a function of its observed depth. This means that the reconstruction error for pixels showing close obstacles in $\d^f_t$ are weighed more than pixels of far obstacles.
+    \item \textbf{Added edge loss} -- We add the an additional mean-absolute error (MAE) term to the reconstruction error of filtered-obstacle edge pixels.
+\end{enumerate}
+
+To go more in detail, the filtering process is the IP-Basic algorithm \cite{filtering_depth_completion} for dilation and hole closing, as used in \cite{LearningStateRepresentation} and \cite{deepCollisionPredictorOracle}. Its implementation is a result of a few benefits for our task. First, minimising the complexity of depth images by rounding shapes emphasises only learning rough shapes. Also, as dilation increases obstacle sizes, filtering provides an extra layer of safety regarding collision avoidance. Finally, filtering also removes noise, which can be important when testing this framework on a real robotic system.
+Then, to avoid the extra computational load of pre-filtering depth images on the robot, we use filtered images as reconstruction targets for some depth input, such that the VAE learns to implicitly perform the filtering process in its forward-pass \cite{LearningStateRepresentation}.
+
+As for the depth weighting, we multiply the pixel-wise error of a reconstruction with the bounded depth gain $K_{\text{depth}}(d_{i,j})$, a function of the filtered-depth pixel value $d_{i,j}$:
+\begin{equation}
+    K_{\text{depth}}(d_{i,j}) = \alpha_\text{depth} \cdot \min \Bigg(\frac{1}{d_{i,j} + 0.5}, 1\Bigg) \qquad \text{for} \quad  i, j \in \dim \, (\d_t^f)
+\end{equation}
+which is illustrated in \cref{fig:5_depth_gain}.
+\begin{figure}[hbt]
+    \centering
+    \includegraphics[width=0.5\textwidth]{figures/5_/5_depth_gain.pdf}
+    \caption{The depth gain to weigh the pixel-wise reconstruction error. Reconstruction errors for very close obstacles (pixel values $d_{i,j}<0.16$) are weighed the same, with $\alpha_\text{depth} = 10.0$.}
+    \label{fig:5_depth_gain}
+\end{figure}
+The idea for the depth weighting is that if we increase the reconstruction error according to its closeness, the pixel-wise loss of close obstacles should dominate the pixel-wise loss of obstacles far away. So close obstacles should be prioritised in the latent space representation.
+Intuitively, this is particularly important for collision avoidance: we wish to distinguish between pixel-wise errors for obstacles far away compared to those immediately nearby. For example, a 1m error for an obstacle 7m away should be considered less important than the same as a 1m error for an obstacle 1.5m away.
+
+We also see that thin obstacles are expected to be reconstructed when they are close by combining depth weighting with filtered targets. This is because their reconstruction targets are more prominent, as many more pixels will produce a high loss, particularly at close range.
+
+Finally, we used a simple homemade procedure to implement the added edge loss. First, we used a Canny edge detector \cite{canny_edge_detection} to find the obstacle edges in $\d_t^f$. After, we used a Gaussian filter to dilate the edges -- taking any pixel value over 0 as an edge. Finally, the pixel-wise MAE of filtered depth reconstruction was multiplied by this image-edge mask to achieve the edge loss. Since we motivated this for clearer reconstructions, the Gaussian filter had to be used to dilate the edges of the image-edge mask. This is because, for the MAE loss to account for the object's shape, it is essential to add the pixel-wise error along the edges of obstacles and the pixel-wise error of neighbouring pixels. 
+
+
+\subsection{Network Architecture}
+\label{subsec:5_vae_architecture}
+With the loss function covered, what remains is the architecture of the VAE. As mentioned, our VAE design was mainly inspired by the work of \cite{deepCollisionPredictorOracle} and \cite{vae_decoder_architecture}, where we utilise a convolution-based encoder-decoder structure.
+The overall structure of the VAE is shown in \cref{fig:5_vae} and its parameters are detailed in \cref{app:vae_params}.
+\begin{figure}[hbt]
+    \centering
+    \makebox[\textwidth]{
+        \includegraphics[width=\textwidth]{figures/5_/5_vae.pdf}}
+    \caption{The VAE network architecture. The encoder is parametrised by a CNN, while the encoder is parametrised by a transposed CNN (ConvT NN). Given a depth image $\d_t$, we can sample from the inference network $\qzgived$ to obtain a latent code $\z_t$. The generative network $\pdfgivez$ then learns to construct the filtered depth image $\d^f_t = f(\d_t)$ from the latent code$\z_t$.}
+    \label{fig:5_vae}
+\end{figure}
+
+\subsubsection{Inference Network}
+\label{subsubsec:5_vae_inference_network}
+Our encoder is follows the CNN design of \cite{deepCollisionPredictorOracle}, though utilises instead two convolution layers before a ResNet8 \cite{KaimingResNet}, with two fully-connected layers at the end. Its structure is shown in \cref{fig:5_encoder}, while the residual blocks are depicted in \cref{fig:5_res_block}.
+\begin{figure}[H]
+    \centering
+        \makebox[\textwidth]{
+        \hspace{1mm}
+        \includegraphics[width=1.\textwidth]{figures/5_/5_encoder.pdf}
+    }
+    \caption{The encoder network architecture. It comprises two convolution layers, with 32 $5\times5$ filters with a stride of 2, three residual blocks with $[32, 64, 128]$ output filters, and two fully connected layers with output dimensions $[128, 128]$. The dimension of the feature map is (roughly) halved for each convolution layer and residual block due to the 2-strided convolutions. The size of the feature map after the last convolution is $15\times9$. (See \cref{app:vae_encoder} for details)}
+    \label{fig:5_encoder}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.4\textwidth]{figures/5_/5_res_block.png}
+    \caption{The residual block architecture. A convolution by a $1\times1$ filter (kernel), with stride 2 is applied to the shortcut connection. $Out$ represents the number of filters of the residual block.}
+    \label{fig:5_res_block}
+\end{figure}
+Regarding our design choices, these were primarily motivated by two factors -- we desired a lightweight network and wished to reduce the dimension of the feature map to be small enough but not too small. 
+The ResNet8 was suitable to satisfy the first aspect, while the depth of the network (through stridden convolutions) was decided to satisfy the other. We also found during testing that reducing the feature dimension below $15 \times 9$ (to $8 \times 5$) resulted in a much worse reconstruction output, discouraging the use of another residual block or stridden convolution layer.
+However, this choice resulted in a dramatically sized linear layer that accounted for 86\% of the encoder weights -- ($128 \cdot 15\times9) \cdot 128$ connections.
+Nevertheless, this was unavoidable since 128 was the minimum number of neurons in the linear layer (64 means and log-variances), which left the alternatives: to either reduce the feature dimension or the number of filters. Though, both options were tested and did not improve results, concluding that this is a feature and not a disadvantage of our encoder.
+
+
+\subsubsection{Generative Network}
+\label{subsubsec:5_vae_generative_network}
+The generative network is inspired from \cite{vae_decoder_architecture}, with an additional linear layer and transposed convolution layer. Its architecture is shown in \cref{fig:5_decoder}. 
+\begin{figure}[hbt]
+    \centering
+        \makebox[\textwidth]{
+        \hspace{1mm}
+        \includegraphics[width=\textwidth]{figures/5_/5_decoder.pdf}
+    }
+    \caption{The decoder network architecture comprises two linear layers and seven transposed convolution layers. Each strode transposed convolution roughly the dimension of the feature map to achieve the final dimension feature map dimension $480\times270$. (See \cref{app:vae_decoder} for details)}
+    \label{fig:5_decoder}
+\end{figure}
+The primary design rule for autoencoders is that the decoder should be a mirror of the encoder so that the network resembles an \textit{hourglass}. As a result, we followed the encoder with two linear layers, including the large linear layer that connects 128 neurons to 128, $9\times5$ filters. As for the transposed convolutions, this is a relatively simple but effective design. The only design choice here was the filter size and number of filters, though these were chosen primarily to match the layer-wise feature dimensions of the encoder and their overall sizes.
+
+Vigorous testing was also done with a ResNet8 decoder, which was designed to mirror our encoder. However, despite its more advanced structure -- with batch normalisation and shortcut connections --, no significant performance gain was observed in training. Conversely, divergence in training was often observed when training on the whole dataset for unknown reasons. Therefore, a final decision was made to use the decoder in \cref{fig:5_decoder}.

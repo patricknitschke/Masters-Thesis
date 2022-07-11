@@ -355,3 +355,6 @@
 
 % Results
 \usepackage{array}
+\renewcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\sigmoid}[1]{\sigma\left(#1\right)} 
+\renewcommand{\arraystretch}{1.05}
